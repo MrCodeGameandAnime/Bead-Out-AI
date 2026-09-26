@@ -1,0 +1,305 @@
+{
+  "screen": "game",
+  "difficulty": null,
+  "size": [
+    916,
+    2035
+  ],
+  "feed": {
+    "current": null,
+    "upcoming": [
+      null,
+      null
+    ],
+    "confidence": 0.0,
+    "source": "right conveyor (top edge)"
+  },
+  "board_region": [
+    216,
+    1259,
+    700,
+    1811
+  ],
+  "warnings": [],
+  "tiles": [
+    {
+      "id": "tile-01",
+      "bbox": [
+        465,
+        1259,
+        576,
+        1385
+      ],
+      "center": [
+        520,
+        1322
+      ],
+      "color": "red",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.908,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-02",
+      "bbox": [
+        590,
+        1259,
+        700,
+        1385
+      ],
+      "center": [
+        645,
+        1322
+      ],
+      "color": "pink",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.903,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-03",
+      "bbox": [
+        338,
+        1263,
+        454,
+        1404
+      ],
+      "center": [
+        396,
+        1333
+      ],
+      "color": "cyan",
+      "kind": "special",
+      "legality": "UNKNOWN",
+      "confidence": 0.48,
+      "locked": false,
+      "number": 200
+    },
+    {
+      "id": "tile-04",
+      "bbox": [
+        217,
+        1279,
+        329,
+        1389
+      ],
+      "center": [
+        273,
+        1334
+      ],
+      "color": null,
+      "kind": "hidden",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-05",
+      "bbox": [
+        338,
+        1402,
+        454,
+        1542
+      ],
+      "center": [
+        396,
+        1472
+      ],
+      "color": "blue",
+      "kind": "special",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": 200
+    },
+    {
+      "id": "tile-06",
+      "bbox": [
+        216,
+        1418,
+        329,
+        1527
+      ],
+      "center": [
+        272,
+        1472
+      ],
+      "color": null,
+      "kind": "hidden",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-07",
+      "bbox": [
+        465,
+        1419,
+        576,
+        1524
+      ],
+      "center": [
+        520,
+        1471
+      ],
+      "color": "green",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-08",
+      "bbox": [
+        589,
+        1419,
+        700,
+        1524
+      ],
+      "center": [
+        644,
+        1471
+      ],
+      "color": "lime",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-09",
+      "bbox": [
+        339,
+        1540,
+        454,
+        1681
+      ],
+      "center": [
+        396,
+        1610
+      ],
+      "color": "cyan",
+      "kind": "special",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": 200
+    },
+    {
+      "id": "tile-10",
+      "bbox": [
+        216,
+        1557,
+        329,
+        1666
+      ],
+      "center": [
+        272,
+        1611
+      ],
+      "color": null,
+      "kind": "hidden",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-11",
+      "bbox": [
+        465,
+        1558,
+        576,
+        1662
+      ],
+      "center": [
+        520,
+        1610
+      ],
+      "color": "green",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-12",
+      "bbox": [
+        589,
+        1559,
+        700,
+        1662
+      ],
+      "center": [
+        644,
+        1610
+      ],
+      "color": "gray",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-13",
+      "bbox": [
+        339,
+        1678,
+        454,
+        1811
+      ],
+      "center": [
+        396,
+        1744
+      ],
+      "color": "blue",
+      "kind": "special",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": 200
+    },
+    {
+      "id": "tile-14",
+      "bbox": [
+        216,
+        1696,
+        329,
+        1804
+      ],
+      "center": [
+        272,
+        1750
+      ],
+      "color": null,
+      "kind": "hidden",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    }
+  ],
+  "decision": {
+    "tile_id": null,
+    "center": null,
+    "reason": "current conveyor color is unknown; pause for a fresh observation",
+    "confidence": 0.0
+  },
+  "timings_ms": {
+    "capture": 0.0,
+    "vision": 331.23,
+    "policy": 0.01,
+    "click": 0.0,
+    "total": 623.4
+  }
+}

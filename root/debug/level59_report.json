@@ -1,0 +1,416 @@
+{
+  "screen": "game",
+  "difficulty": "Very Hard",
+  "size": [
+    932,
+    2072
+  ],
+  "feed": {
+    "current": "pink",
+    "upcoming": [],
+    "confidence": 0.97,
+    "source": "right conveyor (top edge)"
+  },
+  "board_region": [
+    93,
+    1186,
+    840,
+    1744
+  ],
+  "warnings": [],
+  "tiles": [
+    {
+      "id": "tile-01",
+      "bbox": [
+        93,
+        1186,
+        207,
+        1314
+      ],
+      "center": [
+        150,
+        1250
+      ],
+      "color": "yellow",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.822,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-02",
+      "bbox": [
+        220,
+        1186,
+        333,
+        1314
+      ],
+      "center": [
+        276,
+        1250
+      ],
+      "color": "blue",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.892,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-03",
+      "bbox": [
+        346,
+        1186,
+        460,
+        1314
+      ],
+      "center": [
+        403,
+        1250
+      ],
+      "color": "white",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.884,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-04",
+      "bbox": [
+        473,
+        1186,
+        587,
+        1314
+      ],
+      "center": [
+        530,
+        1250
+      ],
+      "color": "green",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.89,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-05",
+      "bbox": [
+        600,
+        1186,
+        713,
+        1314
+      ],
+      "center": [
+        656,
+        1250
+      ],
+      "color": "gray",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.887,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-06",
+      "bbox": [
+        726,
+        1186,
+        840,
+        1314
+      ],
+      "center": [
+        783,
+        1250
+      ],
+      "color": "orange",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.824,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-07",
+      "bbox": [
+        93,
+        1349,
+        206,
+        1455
+      ],
+      "center": [
+        149,
+        1402
+      ],
+      "color": "indigo",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.786,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-08",
+      "bbox": [
+        220,
+        1349,
+        333,
+        1456
+      ],
+      "center": [
+        276,
+        1402
+      ],
+      "color": "red",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.768,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-09",
+      "bbox": [
+        346,
+        1349,
+        460,
+        1456
+      ],
+      "center": [
+        403,
+        1402
+      ],
+      "color": "purple",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-10",
+      "bbox": [
+        473,
+        1349,
+        587,
+        1456
+      ],
+      "center": [
+        530,
+        1402
+      ],
+      "color": "green",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-11",
+      "bbox": [
+        600,
+        1349,
+        713,
+        1456
+      ],
+      "center": [
+        656,
+        1402
+      ],
+      "color": "purple",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.772,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-12",
+      "bbox": [
+        726,
+        1349,
+        840,
+        1456
+      ],
+      "center": [
+        783,
+        1402
+      ],
+      "color": "green",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.764,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-13",
+      "bbox": [
+        93,
+        1490,
+        207,
+        1596
+      ],
+      "center": [
+        150,
+        1543
+      ],
+      "color": "blue",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.832,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-14",
+      "bbox": [
+        220,
+        1490,
+        334,
+        1596
+      ],
+      "center": [
+        277,
+        1543
+      ],
+      "color": "yellow",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.815,
+      "locked": true,
+      "number": null
+    },
+    {
+      "id": "tile-15",
+      "bbox": [
+        346,
+        1490,
+        460,
+        1597
+      ],
+      "center": [
+        403,
+        1543
+      ],
+      "color": "yellow",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-16",
+      "bbox": [
+        473,
+        1490,
+        587,
+        1596
+      ],
+      "center": [
+        530,
+        1543
+      ],
+      "color": "gray",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-17",
+      "bbox": [
+        600,
+        1490,
+        714,
+        1596
+      ],
+      "center": [
+        657,
+        1543
+      ],
+      "color": "indigo",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.833,
+      "locked": false,
+      "number": null
+    },
+    {
+      "id": "tile-18",
+      "bbox": [
+        726,
+        1490,
+        840,
+        1596
+      ],
+      "center": [
+        783,
+        1543
+      ],
+      "color": "pink",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.835,
+      "locked": true,
+      "number": null
+    },
+    {
+      "id": "tile-19",
+      "bbox": [
+        216,
+        1614,
+        337,
+        1744
+      ],
+      "center": [
+        276,
+        1679
+      ],
+      "color": "white",
+      "kind": "special",
+      "legality": "DNH",
+      "confidence": 0.89,
+      "locked": false,
+      "number": 2
+    },
+    {
+      "id": "tile-20",
+      "bbox": [
+        596,
+        1613,
+        717,
+        1744
+      ],
+      "center": [
+        656,
+        1678
+      ],
+      "color": "white",
+      "kind": "special",
+      "legality": "DNH",
+      "confidence": 0.91,
+      "locked": false,
+      "number": 2
+    }
+  ],
+  "decision": {
+    "tile_id": null,
+    "center": null,
+    "reason": "no visibly raised pink tile is available",
+    "confidence": 0.0
+  },
+  "timings_ms": {
+    "capture": 0.0,
+    "vision": 577.52,
+    "policy": 0.03,
+    "click": 0.0,
+    "total": 971.38
+  }
+}
