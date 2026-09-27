@@ -1,12 +1,42 @@
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-from .board import FeedObservation, GameState, LockMarker, Tile
+from .board import FeedObservation, GameState, LockMarker, ScreenControl, Tile
 
 
 TILE_SEARCH_REGION = (0.05, 0.52, 0.89, 0.89)
+_NAVIGATION_REFERENCES = {
+    # The sample rectangles are chosen away from the hand-drawn target marks.
+    # Tap points below are the centers of those marked regions, normalized to
+    # the corresponding annotated reference image dimensions.
+    "home": {
+        "reference": "home_screen.png",
+        "region": (0.25, 0.725, 0.75, 0.79),
+        "sample_size": (96, 24),
+        "screen": "home",
+        "control": "start_level",
+        "target": (219 / 440, 738 / 982),
+    },
+    "failure": {
+        "reference": "failure_03.jpg",
+        "region": (0.16, 0.34, 0.75, 0.57),
+        "sample_size": (96, 64),
+        "screen": "failure",
+        "control": "dismiss_failure",
+        "target": (599 / 691, 466 / 1536),
+    },
+}
+_NAVIGATION_MATCH_THRESHOLD = 0.86
+_OUT_OF_SPACE_CONTROLS = {
+    # The annotated images remain documentation for the marked top-right X.
+    # The live Level 80 modal uses a bottom-center X, so its target is stored
+    # independently from screen recognition and from the raw regression image.
+    "annotated_header": ("close", (639 / 691, 268 / 1536)),
+    "live_bottom": ("close", (0.5, 2273 / 2400)),
+}
 _PALETTE_HUES = {
     "red": (0, 255),
     "orange": (17, 255),
@@ -446,6 +476,98 @@ def _screen_type(rgb: np.ndarray, tiles: tuple[Tile, ...]) -> str:
     return "unknown"
 
 
+def _normalized_region(
+    image: Image.Image,
+    region: tuple[float, float, float, float],
+    sample_size: tuple[int, int],
+) -> np.ndarray:
+    width, height = image.size
+    left, top, right, bottom = region
+    crop = image.crop((
+        round(left * width),
+        round(top * height),
+        round(right * width),
+        round(bottom * height),
+    ))
+    return np.asarray(crop.resize(sample_size, Image.Resampling.BILINEAR), dtype=np.int16)
+
+
+@lru_cache(maxsize=len(_NAVIGATION_REFERENCES))
+def _navigation_template(name: str) -> np.ndarray:
+    reference = _NAVIGATION_REFERENCES[name]
+    root = Path(__file__).resolve().parents[2]
+    image = Image.open(root / "img" / reference["reference"]).convert("RGB")
+    return _normalized_region(image, reference["region"], reference["sample_size"])
+
+
+def _out_of_space_variant(rgb: np.ndarray) -> str | None:
+    """Recognize the shared Out-of-Space modal from layout-level cues."""
+    height, width = rgb.shape[:2]
+    header = rgb[
+        int(0.10 * height) : int(0.22 * height),
+        int(0.08 * width) : int(0.92 * width),
+    ]
+    channel_max = header.max(axis=2)
+    channel_min = header.min(axis=2)
+    bright_text = (channel_min > 205) & ((channel_max - channel_min) < 80)
+    if float(bright_text.mean()) < 0.05:
+        return None
+
+    blue_banner = (
+        (header[:, :, 2] > header[:, :, 0] * 1.2)
+        & (header[:, :, 2] > header[:, :, 1] * 0.9)
+        & (header[:, :, 2] > 110)
+    )
+    if float(blue_banner.mean()) > 0.35:
+        return "annotated_header"
+
+    # The raw live modal dims the underlying board and presents its close X at
+    # the bottom center; the annotated target references use a bright blue
+    # header and a top-right X. These features distinguish the target layout
+    # without requiring their pixels to match the annotations.
+    if float(rgb.mean()) / 255.0 < 0.35:
+        red_title = (
+            (header[:, :, 0] > 150)
+            & (header[:, :, 1] < 130)
+            & (header[:, :, 2] < 140)
+        )
+        if float(red_title.mean()) > 0.01:
+            return "live_bottom"
+    return None
+
+
+def _navigation_screen(image: Image.Image, rgb: np.ndarray) -> tuple[str, tuple[ScreenControl, ...]] | None:
+    """Recognize navigation states, keeping screen cues separate from targets."""
+    out_of_space_variant = _out_of_space_variant(rgb)
+    if out_of_space_variant is not None:
+        control_kind, (target_x, target_y) = _OUT_OF_SPACE_CONTROLS[out_of_space_variant]
+        control = ScreenControl(
+            control_kind,
+            (round(target_x * image.width), round(target_y * image.height)),
+            0.92 if out_of_space_variant == "live_bottom" else 0.98,
+        )
+        return "out_of_space", (control,)
+
+    scores: list[tuple[float, str]] = []
+    for name, reference in _NAVIGATION_REFERENCES.items():
+        observed = _normalized_region(image, reference["region"], reference["sample_size"])
+        template = _navigation_template(name)
+        similarity = 1.0 - float(np.abs(observed - template).mean()) / 255.0
+        scores.append((similarity, name))
+    similarity, name = max(scores)
+    if similarity < _NAVIGATION_MATCH_THRESHOLD:
+        return None
+
+    reference = _NAVIGATION_REFERENCES[name]
+    target_x, target_y = reference["target"]
+    control = ScreenControl(
+        reference["control"],
+        (round(target_x * image.width), round(target_y * image.height)),
+        round(similarity, 3),
+    )
+    return reference["screen"], (control,)
+
+
 def _read_feed(hsv: np.ndarray) -> FeedObservation:
     # Queue direction and the entry point into the center loop are not yet
     # calibrated across board layouts. Never promote a color patch near the
@@ -459,8 +581,14 @@ def analyze_frame(source: str | Path | Image.Image) -> GameState:
     image = image.convert("RGB")
     rgb = np.asarray(image)
     hsv = np.asarray(image.convert("HSV"))
-    tiles, locks = _find_tiles(rgb, hsv)
-    screen = _screen_type(rgb, tiles)
+    navigation = _navigation_screen(image, rgb)
+    if navigation is None:
+        tiles, locks = _find_tiles(rgb, hsv)
+        screen = _screen_type(rgb, tiles)
+        controls: tuple[ScreenControl, ...] = ()
+    else:
+        screen, controls = navigation
+        tiles, locks = (), ()
     if tiles:
         left = min(tile.bbox[0] for tile in tiles)
         top = min(tile.bbox[1] for tile in tiles)
@@ -469,7 +597,8 @@ def analyze_frame(source: str | Path | Image.Image) -> GameState:
         board_region = (left, top, right, bottom)
     else:
         board_region = None
-    warnings = () if screen == "game" else ("No confident gameplay board was detected.",)
+    recognized_screens = {"game", "home", "out_of_space", "failure"}
+    warnings = () if screen in recognized_screens else ("No confident gameplay board was detected.",)
     return GameState(
         screen=screen,
         width=image.width,
@@ -480,4 +609,5 @@ def analyze_frame(source: str | Path | Image.Image) -> GameState:
         difficulty=_read_difficulty(rgb),
         locks=locks,
         warnings=warnings,
+        controls=controls,
     )

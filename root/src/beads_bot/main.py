@@ -16,6 +16,9 @@ from .recording import RunRecorder, classify_transition
 from .vision import analyze_frame
 
 
+_MAX_UNKNOWN_REOBSERVATIONS = 4
+
+
 def _boxes_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> bool:
     return first[0] < second[2] and second[0] < first[2] and first[1] < second[3] and second[1] < first[3]
 
@@ -183,6 +186,48 @@ def _safe_continue(state: GameState) -> ScreenControl | None:
     return max(safe, key=lambda control: control.confidence, default=None)
 
 
+def _safe_navigation_control(state: GameState) -> ScreenControl | None:
+    """Return only the safe navigation control declared for this screen."""
+    expected = {
+        "home": "start_level",
+        "out_of_space": "close",
+        "failure": "dismiss_failure",
+    }.get(state.screen)
+    if expected is None:
+        return None
+    return max(
+        (
+            control for control in state.controls
+            if control.kind == expected
+            and control.cost is None
+            and not control.requires_ad
+            and control.confidence >= 0.86
+        ),
+        key=lambda control: control.confidence,
+        default=None,
+    )
+
+
+def _control_transition_outcomes(
+    before_state: GameState,
+    after_state: GameState,
+) -> tuple[InteractionOutcome, StrategicOutcome]:
+    interaction = (
+        InteractionOutcome.ACTION_ACCEPTED
+        if _state_signature(before_state) != _state_signature(after_state)
+        else InteractionOutcome.NO_CHANGE
+    )
+    if after_state.screen == "failure":
+        strategic = StrategicOutcome.LEVEL_FAILURE
+    elif after_state.screen == "complete":
+        strategic = StrategicOutcome.LEVEL_SUCCESS
+    elif after_state.screen in ("game", "home", "out_of_space"):
+        strategic = StrategicOutcome.IN_PROGRESS
+    else:
+        strategic = StrategicOutcome.UNKNOWN
+    return interaction, strategic
+
+
 def run_live(
     args: argparse.Namespace,
     *,
@@ -198,18 +243,67 @@ def run_live(
     action_count = 0
     input_count = 0
     max_moves = getattr(args, "max_moves", None)
+    attempt_history: list[dict] = []
+    last_finalized: dict | None = None
+
+    def finish_attempt(status: str, reason: str) -> dict:
+        nonlocal last_finalized
+        summary = _terminal_summary(recorder, status, reason, action_count, input_count)
+        attempt_history.append({
+            "run_id": summary["run_id"],
+            "status": summary["status"],
+            "reason": summary["reason"],
+            "action_count": summary["action_count"],
+            "manifest_path": summary["manifest_path"],
+        })
+        summary["attempt_history"] = list(attempt_history)
+        last_finalized = summary
+        return summary
+
+    def recovery_incomplete(reason: str) -> dict:
+        summary = dict(last_finalized or {})
+        summary["session_status"] = "recovery_incomplete"
+        summary["session_reason"] = reason
+        summary["attempt_history"] = list(attempt_history)
+        return summary
 
     try:
         current_frame = capture_fn(args.adb, args.serial)
         current_state = analyze_fn(current_frame.image)
     except Exception as error:
-        return _terminal_summary(recorder, "device_error", f"initial capture failed: {error}", action_count, input_count)
+        return finish_attempt("device_error", f"initial capture failed: {error}")
 
     attempted: set[str] = set()
     active_signature: tuple | None = None
+    unknown_reobservations = 0
     while True:
         state = current_state
         frame = current_frame.image
+        if state.screen != "unknown":
+            unknown_reobservations = 0
+        if recorder is None:
+            if state.screen == "unknown" and unknown_reobservations < _MAX_UNKNOWN_REOBSERVATIONS:
+                try:
+                    sleep_fn(max(0.0, args.settle_seconds))
+                    next_frame = capture_fn(args.adb, args.serial)
+                    next_state = analyze_fn(next_frame.image)
+                except Exception as error:
+                    return recovery_incomplete(f"home screen re-observation failed: {error}")
+                unknown_reobservations = (
+                    unknown_reobservations + 1 if next_state.screen == "unknown" else 0
+                )
+                current_frame, current_state = next_frame, next_state
+                continue
+            if state.screen != "home":
+                return recovery_incomplete(
+                    f"expected the annotated home screen after failure dismissal; observed {state.screen}"
+                )
+            recorder = recorder_factory(debug_root / "runs", debug_root / "mechanic_evidence.jsonl")
+            action_count = 0
+            input_count = 0
+            attempted.clear()
+            active_signature = None
+
         signature = _state_signature(state)
         if signature != active_signature:
             attempted.clear()
@@ -221,14 +315,133 @@ def run_live(
                 interaction=InteractionOutcome.NOT_ATTEMPTED,
                 strategic=StrategicOutcome.LEVEL_FAILURE,
             )
-            return _terminal_summary(recorder, "failure", "confirmed failure screen", action_count, input_count)
+            failed_attempt = finish_attempt("failure", "confirmed Level Failed screen")
+            if not args.execute:
+                return failed_attempt
+            control = _safe_navigation_control(state)
+            if control is None:
+                failed_attempt["session_status"] = "recovery_incomplete"
+                failed_attempt["session_reason"] = "no annotated failure close target was recognized"
+                return failed_attempt
+            try:
+                tap_fn(control.center[0], control.center[1], args.adb, args.serial)
+                sleep_fn(max(0.0, args.settle_seconds))
+                next_frame = capture_fn(args.adb, args.serial)
+                next_state = analyze_fn(next_frame.image)
+            except Exception as error:
+                failed_attempt["session_status"] = "recovery_incomplete"
+                failed_attempt["session_reason"] = f"failure dismissal failed: {error}"
+                return failed_attempt
+            recorder = None
+            action_count = 0
+            input_count = 0
+            attempted.clear()
+            active_signature = None
+            current_frame, current_state = next_frame, next_state
+            continue
+
+        if state.screen in ("out_of_space", "home"):
+            control = _safe_navigation_control(state)
+            if not args.execute:
+                _record_observation(
+                    recorder, frame=frame, state=state,
+                    interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.IN_PROGRESS,
+                )
+                return finish_attempt("dry_run", f"{state.screen} recognized; execution is disabled")
+            if control is None:
+                _record_observation(
+                    recorder, frame=frame, state=state,
+                    interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.IN_PROGRESS,
+                )
+                return finish_attempt("unrecognized_ui", f"{state.screen} has no safe navigation control")
+            try:
+                click_ms = tap_fn(control.center[0], control.center[1], args.adb, args.serial)
+                input_count += 1
+                sleep_fn(max(0.0, args.settle_seconds))
+                next_frame = capture_fn(args.adb, args.serial)
+                next_state = analyze_fn(next_frame.image)
+            except Exception as error:
+                _record_observation(
+                    recorder,
+                    frame=frame,
+                    state=state,
+                    tap_point=control.center,
+                    interaction=InteractionOutcome.UNKNOWN,
+                    strategic=StrategicOutcome.UNKNOWN,
+                    timings={"tap": 0.0},
+                )
+                return finish_attempt("device_error", f"navigation action failed: {error}")
+
+            interaction, strategic = _control_transition_outcomes(state, next_state)
+            _record_observation(
+                recorder,
+                frame=frame,
+                state=state,
+                tap_point=control.center,
+                after_state=next_state,
+                after_frame=next_frame.image,
+                interaction=interaction,
+                strategic=strategic,
+                timings={"tap": float(click_ms), "verify_capture": next_frame.elapsed_ms},
+            )
+            if interaction == InteractionOutcome.NO_CHANGE:
+                return finish_attempt("no_progress", f"{state.screen} navigation target produced no state change")
+            if state.screen == "home" and next_state.screen == "game":
+                attempted.clear()
+                active_signature = None
+            current_frame, current_state = next_frame, next_state
+            continue
+
+        if state.screen == "unknown":
+            if not args.execute or unknown_reobservations >= _MAX_UNKNOWN_REOBSERVATIONS:
+                _record_observation(
+                    recorder, frame=frame, state=state,
+                    interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.UNKNOWN,
+                )
+                reason = (
+                    "screen remained unrecognized after passive re-observation"
+                    if args.execute else "screen is unrecognized; execution is disabled"
+                )
+                return finish_attempt("unrecognized_ui", reason)
+            try:
+                sleep_fn(max(0.0, args.settle_seconds))
+                next_frame = capture_fn(args.adb, args.serial)
+                next_state = analyze_fn(next_frame.image)
+            except Exception as error:
+                _record_observation(
+                    recorder, frame=frame, state=state,
+                    interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.UNKNOWN,
+                    timings={"verify_capture": 0.0},
+                )
+                return finish_attempt("device_error", f"passive screen re-observation failed: {error}")
+            interaction, strategic = classify_transition(state, next_state, None)
+            _record_observation(
+                recorder,
+                frame=frame,
+                state=state,
+                after_state=next_state,
+                after_frame=next_frame.image,
+                interaction=interaction,
+                strategic=strategic,
+                timings={"verify_capture": next_frame.elapsed_ms},
+            )
+            unknown_reobservations = (
+                unknown_reobservations + 1 if next_state.screen == "unknown" else 0
+            )
+            current_frame, current_state = next_frame, next_state
+            continue
+
         if state.screen not in ("game", "complete"):
             _record_observation(
                 recorder, frame=frame, state=state,
                 interaction=InteractionOutcome.NOT_ATTEMPTED,
                 strategic=StrategicOutcome.UNKNOWN,
             )
-            return _terminal_summary(recorder, "unrecognized_ui", "screen could not be recognized", action_count, input_count)
+            return finish_attempt("unrecognized_ui", "screen could not be recognized")
 
         if state.screen == "complete":
             control = _safe_continue(state)
@@ -239,7 +452,7 @@ def run_live(
                     interaction=InteractionOutcome.NOT_ATTEMPTED,
                     strategic=StrategicOutcome.LEVEL_SUCCESS,
                 )
-                return _terminal_summary(recorder, "success", reason, action_count, input_count)
+                return finish_attempt("success", reason)
             try:
                 click_ms = tap_fn(control.center[0], control.center[1], args.adb, args.serial)
                 input_count += 1
@@ -253,7 +466,7 @@ def run_live(
                     strategic=StrategicOutcome.LEVEL_SUCCESS,
                     timings={"tap": 0.0},
                 )
-                return _terminal_summary(recorder, "device_error", f"continuation action failed: {error}", action_count, input_count)
+                return finish_attempt("device_error", f"continuation action failed: {error}")
             changed = _state_signature(state) != _state_signature(next_state)
             _record_observation(
                 recorder,
@@ -277,13 +490,7 @@ def run_live(
             if next_state.screen == "unknown":
                 current_frame, current_state = next_frame, next_state
                 continue
-            return _terminal_summary(
-                recorder,
-                "success",
-                "level completed; continuation did not leave the completion screen",
-                action_count,
-                input_count,
-            )
+            return finish_attempt("success", "level completed; continuation did not leave the completion screen")
 
         policy_started = time.perf_counter()
         candidates = rank_candidates(
@@ -300,7 +507,7 @@ def run_live(
                 timings={"policy": round(policy_ms, 2)},
             )
             reason = "no plausible action" if not attempted else "all distinct candidates had no change for this state"
-            return _terminal_summary(recorder, "no_progress", reason, action_count, input_count)
+            return finish_attempt("no_progress", reason)
 
         chosen = candidates[0]
         if not args.execute:
@@ -310,7 +517,7 @@ def run_live(
                 strategic=StrategicOutcome.IN_PROGRESS,
                 timings={"policy": round(policy_ms, 2)},
             )
-            return _terminal_summary(recorder, "dry_run", "execution is disabled", action_count, input_count)
+            return finish_attempt("dry_run", "execution is disabled")
         if max_moves is not None and action_count >= max_moves:
             _record_observation(
                 recorder, frame=frame, state=state, candidates=candidates, chosen=chosen,
@@ -318,7 +525,7 @@ def run_live(
                 strategic=StrategicOutcome.IN_PROGRESS,
                 timings={"policy": round(policy_ms, 2)},
             )
-            return _terminal_summary(recorder, "move_limit", "user move limit reached", action_count, input_count)
+            return finish_attempt("move_limit", "user move limit reached")
 
         click_started = time.perf_counter()
         try:
@@ -341,7 +548,7 @@ def run_live(
                 strategic=StrategicOutcome.UNKNOWN,
                 timings={"policy": round(policy_ms, 2), "tap_and_capture": round(click_elapsed, 2)},
             )
-            return _terminal_summary(recorder, "device_error", f"action execution failed: {error}", action_count, input_count)
+            return finish_attempt("device_error", f"action execution failed: {error}")
 
         interaction, strategic = classify_transition(state, next_state, chosen)
         _record_observation(

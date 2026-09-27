@@ -148,10 +148,50 @@ class VisionSampleTests(unittest.TestCase):
         self.assertEqual(actual_raised, expected_raised)
         self.assertEqual(actual_depressed, expected_depressed)
 
-    def test_home_screen_is_not_reported_as_a_game_board(self):
-        state = analyze_frame(SAMPLES / "level51_home_screen.png")
+    def test_annotated_home_reference_exposes_only_its_marked_play_target(self):
+        state = analyze_frame(SAMPLES / "home_screen.png")
 
-        self.assertNotEqual(state.screen, "game")
+        self.assertEqual(state.screen, "home")
+        self.assertEqual(
+            [(control.kind, control.center) for control in state.controls],
+            [("start_level", (219, 738))],
+        )
+
+    def test_annotated_out_of_space_offer_exposes_only_its_marked_close_target(self):
+        state = analyze_frame(SAMPLES / "failure_01.jpg")
+
+        self.assertEqual(state.screen, "out_of_space")
+        self.assertEqual(
+            [(control.kind, control.center) for control in state.controls],
+            [("close", (639, 268))],
+        )
+
+    def test_annotated_life_loss_warning_is_not_level_failure(self):
+        state = analyze_frame(SAMPLES / "failure_02.jpg")
+
+        self.assertEqual(state.screen, "out_of_space")
+        self.assertEqual(
+            [(control.kind, control.center) for control in state.controls],
+            [("close", (639, 268))],
+        )
+
+    def test_raw_level80_out_of_space_frame_exposes_only_its_safe_close_target(self):
+        state = analyze_frame(SAMPLES / "level80_live_out_of_space.jpg")
+
+        self.assertEqual(state.screen, "out_of_space")
+        self.assertEqual(
+            [(control.kind, control.center) for control in state.controls],
+            [("close", (540, 2273))],
+        )
+
+    def test_annotated_level_failed_screen_exposes_only_its_marked_close_target(self):
+        state = analyze_frame(SAMPLES / "failure_03.jpg")
+
+        self.assertEqual(state.screen, "failure")
+        self.assertEqual(
+            [(control.kind, control.center) for control in state.controls],
+            [("dismiss_failure", (599, 466))],
+        )
 
     def test_completion_screen_is_not_reported_as_a_game_board(self):
         state = analyze_frame(SAMPLES / "level_complete_congrats.png")

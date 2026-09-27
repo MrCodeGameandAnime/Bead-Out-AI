@@ -103,7 +103,7 @@ def classify_transition(
         and after_state.progress > before_state.progress
     ):
         strategic = StrategicOutcome.LOCAL_PROGRESS
-    elif after_state.screen == "game":
+    elif after_state.screen in ("game", "home", "out_of_space"):
         strategic = StrategicOutcome.IN_PROGRESS
     else:
         strategic = StrategicOutcome.UNKNOWN

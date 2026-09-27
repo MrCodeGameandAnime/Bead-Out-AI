@@ -164,17 +164,125 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual(captures, 3)
         self.assertEqual(result["status"], "no_progress")
 
-    def test_confirmed_failure_stops_input_and_finalizes_failure_bundle(self):
-        game = _state([_tile("first", 20), _tile("second", 120)])
-        failure = _state(screen="failure")
+    def test_out_of_space_recovery_records_failure_then_starts_a_separate_attempt(self):
+        game = _state([_tile("before-failure", 20)])
+        offer = _state(
+            screen="out_of_space",
+            controls=(
+                ScreenControl("free_space", (10, 10), 1.0, cost=900),
+                ScreenControl("close", (90, 90), 0.99),
+            ),
+        )
+        warning = _state(
+            screen="out_of_space",
+            controls=(
+                ScreenControl("continue_for_free", (11, 11), 1.0, requires_ad=True),
+                ScreenControl("close", (91, 91), 0.99),
+            ),
+        )
+        failure = _state(
+            screen="failure",
+            controls=(
+                ScreenControl("try_again", (12, 12), 1.0),
+                ScreenControl("keep_going", (13, 13), 1.0),
+                ScreenControl("dismiss_failure", (92, 92), 0.99),
+            ),
+        )
+        home = _state(screen="home", controls=(ScreenControl("start_level", (93, 93), 0.99),))
+        restarted_game = _state([_tile("after-restart", 20)])
+        after_restart_action = _state([_tile("after-restart", 120)])
+        transition_frame = _state(screen="unknown")
+        home_transition_frame = _state(screen="unknown")
 
-        result, taps, captures = self._run([game, failure, game], max_moves=None)
-        manifest = json.loads(Path(result["manifest_path"]).read_text(encoding="utf-8"))
+        states = [
+            game, transition_frame, offer, warning, failure, home_transition_frame, home,
+            restarted_game, after_restart_action,
+        ]
+        images = []
+        state_by_pixel = {}
+        for index, state in enumerate(states, start=1):
+            pixel = (index, 0, 0)
+            state_by_pixel[pixel] = state
+            images.append(Image.new("RGB", (1, 1), pixel))
+        cursor = 0
+        taps = []
+        debug_dir = Path(self.temp.name) / "recovery"
 
-        self.assertEqual(taps, [(50, 50)])
-        self.assertEqual(captures, 2)
-        self.assertEqual(result["status"], "failure")
-        self.assertTrue(manifest["possible_failure_example"])
+        def capture_fn(_adb=None, _serial=None):
+            nonlocal cursor
+            index = min(cursor, len(images) - 1)
+            cursor += 1
+            return CapturedFrame(images[index], 1.0)
+
+        def tap_fn(x, y, _adb=None, _serial=None):
+            taps.append((x, y))
+            if (x, y) == (92, 92):
+                manifests = list((debug_dir / "runs").glob("*/manifest.json"))
+                self.assertEqual(len(manifests), 1)
+                failure_manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
+                self.assertEqual(failure_manifest["status"], "failure")
+                records = [
+                    json.loads(line)
+                    for line in (debug_dir / "mechanic_evidence.jsonl").read_text(encoding="utf-8").splitlines()
+                ]
+                self.assertIn("LEVEL_FAILURE", [record.get("strategic_outcome") for record in records])
+            return 0.5
+
+        args = argparse.Namespace(
+            adb=None,
+            serial=None,
+            debug_dir=debug_dir,
+            execute=True,
+            max_moves=1,
+            loop=False,
+            settle_seconds=0.0,
+        )
+        result = main_module.run_live(
+            args,
+            capture_fn=capture_fn,
+            tap_fn=tap_fn,
+            analyze_fn=lambda image: state_by_pixel[image.getpixel((0, 0))],
+            sleep_fn=lambda _seconds: None,
+        )
+
+        self.assertEqual(taps, [(50, 50), (90, 90), (91, 91), (92, 92), (93, 93), (50, 50)])
+        self.assertEqual(result["status"], "move_limit")
+        manifests = [
+            json.loads(path.read_text(encoding="utf-8"))
+            for path in (debug_dir / "runs").glob("*/manifest.json")
+        ]
+        self.assertEqual(sorted(manifest["status"] for manifest in manifests), ["failure", "move_limit"])
+        failed = next(manifest for manifest in manifests if manifest["status"] == "failure")
+        self.assertTrue(failed["possible_failure_example"])
+        self.assertTrue(any(step["outcomes"]["strategic"] == "LEVEL_FAILURE" for step in failed["recent_steps"]))
+        self.assertTrue(any(step["before_state"]["screen"] == "out_of_space" for step in failed["recent_steps"]))
+        failed_manifest_path = next(
+            path for path in (debug_dir / "runs").glob("*/manifest.json")
+            if json.loads(path.read_text(encoding="utf-8"))["run_id"] == failed["run_id"]
+        )
+        failed_events_path = failed_manifest_path.parent / failed["events_path"]
+        failed_events = [
+            json.loads(line)
+            for line in failed_events_path.read_text(encoding="utf-8").splitlines()
+        ]
+        out_of_space_events = [
+            event for event in failed_events
+            if event["after_state"] is not None
+            and event["after_state"]["screen"] == "out_of_space"
+        ]
+        self.assertTrue(out_of_space_events)
+        self.assertTrue(all(event["outcomes"]["strategic"] == "IN_PROGRESS" for event in out_of_space_events))
+
+        records = [
+            json.loads(line)
+            for line in (debug_dir / "mechanic_evidence.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        failure_episodes = [
+            record for record in records
+            if record.get("record_type") == "episode" and record.get("strategic_outcome") == "LEVEL_FAILURE"
+        ]
+        self.assertEqual(len(failure_episodes), 1)
+        self.assertEqual(len(failure_episodes[0]["sequence"]), 1)
 
     def test_capture_failure_after_tap_counts_the_accepted_input_attempt(self):
         game = _state([_tile("first", 20)])
