@@ -9,6 +9,8 @@ class FeedObservation:
     upcoming: tuple[str | None, ...]
     confidence: float
     source: str
+    direction: str | None = None
+    direction_confidence: float = 0.0
 
 
 class InteractionOutcome(str, Enum):
@@ -91,3 +93,4 @@ class GameState:
     warnings: tuple[str, ...] = ()
     progress: float | None = None
     controls: tuple[ScreenControl, ...] = ()
+    modal_substate: str | None = None

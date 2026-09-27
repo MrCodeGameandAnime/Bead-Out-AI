@@ -77,7 +77,22 @@ def _requirements(state: GameState, tile: Tile) -> tuple[RequirementEvidence, ..
     else:
         color_status = "UNCERTAIN"
 
-    if state.feed.current is None:
+    upcoming_offset = next(
+        (index for index, color in enumerate(state.feed.upcoming) if color == tile.color and color is not None),
+        None,
+    )
+    if state.feed.current is None and tile.color is not None and upcoming_offset is not None:
+        direction_known = state.feed.direction_confidence >= 0.65
+        feed_status = "LIKELY" if direction_known else "UNCERTAIN"
+        feed_confidence = max(
+            0.25,
+            state.feed.confidence
+            * (state.feed.direction_confidence if direction_known else 0.45)
+            * (0.90 ** (upcoming_offset + 1)),
+        )
+        direction_text = "temporal order confirmed" if direction_known else "approach order unconfirmed"
+        feed_source = f"{state.feed.source}; {direction_text}; visible upcoming color at offset {upcoming_offset + 1}"
+    elif state.feed.current is None:
         feed_status: EvidenceStatus = "UNKNOWN"
         feed_confidence = 0.2
         feed_source = state.feed.source or "current feed color is unknown"
@@ -93,6 +108,17 @@ def _requirements(state: GameState, tile: Tile) -> tuple[RequirementEvidence, ..
         feed_status = "KNOWN" if state.feed.confidence >= 0.75 else "LIKELY"
         feed_confidence = state.feed.confidence
         feed_source = f"{state.feed.source}; color matches"
+    elif tile.color is not None and upcoming_offset is not None:
+        direction_known = state.feed.direction_confidence >= 0.65
+        feed_status = "LIKELY" if direction_known else "UNCERTAIN"
+        feed_confidence = max(
+            0.25,
+            state.feed.confidence
+            * (state.feed.direction_confidence if direction_known else 0.45)
+            * (0.90 ** (upcoming_offset + 1)),
+        )
+        direction_text = "temporal order confirmed" if direction_known else "approach order unconfirmed"
+        feed_source = f"{state.feed.source}; {direction_text}; visible upcoming color at offset {upcoming_offset + 1}"
     else:
         feed_status = "UNCERTAIN"
         feed_confidence = 0.35
@@ -163,6 +189,16 @@ def _context(state: GameState, tile: Tile) -> EvidenceContext:
     bw, bh = max(1, bx1 - bx0), max(1, by1 - by0)
     cx, cy = tile.center
     locked, _, _ = _lock_relation(state, tile)
+    if tile.color == state.feed.current and state.feed.current is not None:
+        feed_match = "current"
+        feed_match_offset = 0
+    else:
+        upcoming_offset = next(
+            (index for index, color in enumerate(state.feed.upcoming) if color == tile.color and color is not None),
+            None,
+        )
+        feed_match = "imminent" if upcoming_offset is not None else "unmatched"
+        feed_match_offset = upcoming_offset + 1 if upcoming_offset is not None else None
     return EvidenceContext(
         mechanic_id="tile-selection",
         features={
@@ -172,7 +208,12 @@ def _context(state: GameState, tile: Tile) -> EvidenceContext:
             "tile_locked": tile.locked,
             "lock_overlap": locked,
             "feed_current": state.feed.current,
+            "feed_upcoming": state.feed.upcoming,
+            "feed_direction": state.feed.direction,
+            "feed_direction_confidence": state.feed.direction_confidence,
             "feed_class": "known" if state.feed.current is not None else "unknown",
+            "feed_match": feed_match,
+            "feed_match_offset": feed_match_offset,
             "local_geometry": {
                 "x": round((cx - bx0) / bw, 3),
                 "y": round((cy - by0) / bh, 3),
@@ -199,7 +240,23 @@ def _candidate(state: GameState, tile: Tile, evidence_for: Callable[[EvidenceCon
     context = _context(state, tile)
     support = sum(_REQUIREMENT_WEIGHTS[item.name] * _STATUS_SUPPORT[item.status] for item in requirements)
     tally = evidence_for(context) if evidence_for is not None else EvidenceTally()
-    score = max(0.0, min(1.0, support + _evidence_adjustment(tally)))
+    feed_match_bonus = 0.0
+    if tile.color is not None and tile.color == state.feed.current:
+        feed_match_bonus = 0.055 * min(1.0, state.feed.confidence)
+    elif tile.color is not None:
+        upcoming_offset = next(
+            (index for index, color in enumerate(state.feed.upcoming) if color == tile.color and color is not None),
+            None,
+        )
+        if upcoming_offset is not None:
+            direction_support = state.feed.direction_confidence if state.feed.direction_confidence >= 0.65 else 0.40
+            feed_match_bonus = (
+                0.045
+                * min(1.0, state.feed.confidence)
+                * direction_support
+                / (upcoming_offset + 1)
+            )
+    score = max(0.0, min(1.0, support + _evidence_adjustment(tally) + feed_match_bonus))
     confidence = sum(item.confidence for item in requirements) / len(requirements)
     assumptions = tuple(
         f"{item.name}={item.status}: {item.source}"

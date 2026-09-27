@@ -44,7 +44,7 @@ class PolicySampleTests(unittest.TestCase):
         decision = choose_move(state)
 
         self.assertIsNotNone(decision.tile)
-        self.assertIsNone(state.feed.current)
+        self.assertEqual(state.feed.current, "green")
         candidates = getattr(decision, "candidates", ())
         self.assertTrue(candidates)
         self.assertEqual(candidates[0].tile, decision.tile)
@@ -79,6 +79,31 @@ class PolicySampleTests(unittest.TestCase):
         self.assertLess(ranked_ids.index("ordinary"), ranked_ids.index("special"))
         self.assertLess(ranked_ids.index("ordinary"), ranked_ids.index("lock-affected"))
         self.assertLess(ranked_ids.index("ordinary"), ranked_ids.index("uncertain"))
+
+    def test_current_and_imminent_feed_matches_raise_candidate_rank(self):
+        current = _tile("current-match", 10, color="blue")
+        imminent = _tile("imminent-match", 110, color="red")
+        unrelated = _tile("unrelated", 210, color="green")
+        state = _state(
+            [current, imminent, unrelated],
+            feed=FeedObservation("blue", ("red", None), 0.9, "visible outlet"),
+        )
+
+        candidates = policy_module.rank_candidates(state)
+        ranked_ids = [candidate.tile.id for candidate in candidates]
+
+        self.assertLess(ranked_ids.index("current-match"), ranked_ids.index("unrelated"))
+        self.assertLess(ranked_ids.index("imminent-match"), ranked_ids.index("unrelated"))
+
+    def test_unknown_feed_still_keeps_optimistic_candidates(self):
+        state = _state(
+            [_tile("first", 10, color="blue"), _tile("second", 110, color="red")],
+            feed=FeedObservation(None, (None, None), 0.0, "hidden feed"),
+        )
+
+        candidates = policy_module.rank_candidates(state)
+
+        self.assertEqual({candidate.tile.id for candidate in candidates}, {"first", "second"})
 
     def test_uncertain_special_or_locked_tile_remains_as_fallback(self):
         special = _tile("special", 10, kind="special")
@@ -147,7 +172,7 @@ class PolicySampleTests(unittest.TestCase):
             "special_rule", "lock_rule", "other_mechanics",
         })
         self.assertEqual(report["outcomes"], {"interaction": "NOT_ATTEMPTED", "strategic": "UNKNOWN"})
-        self.assertIsNone(report["feed"]["current"])
+        self.assertEqual(report["feed"]["current"], "green")
         self.assertEqual(report["execution"], "offline: no input sent")
 
 

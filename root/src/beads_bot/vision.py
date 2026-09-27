@@ -1,3 +1,4 @@
+from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -536,7 +537,26 @@ def _out_of_space_variant(rgb: np.ndarray) -> str | None:
     return None
 
 
-def _navigation_screen(image: Image.Image, rgb: np.ndarray) -> tuple[str, tuple[ScreenControl, ...]] | None:
+def _out_of_space_substate(rgb: np.ndarray) -> str:
+    """Distinguish the offer and life-loss page inside the shared modal state."""
+    height, width = rgb.shape[:2]
+    body = rgb[
+        int(0.30 * height) : int(0.59 * height),
+        int(0.30 * width) : int(0.70 * width),
+    ].astype(np.int16)
+    red_heart = (
+        (body[:, :, 0] >= 145)
+        & (body[:, :, 1] <= 115)
+        & (body[:, :, 2] <= 120)
+        & (body[:, :, 0] >= body[:, :, 1] * 1.45)
+    )
+    return "life_warning" if float(red_heart.mean()) >= 0.10 else "space_offer"
+
+
+def _navigation_screen(
+    image: Image.Image,
+    rgb: np.ndarray,
+) -> tuple[str, tuple[ScreenControl, ...], str | None] | None:
     """Recognize navigation states, keeping screen cues separate from targets."""
     out_of_space_variant = _out_of_space_variant(rgb)
     if out_of_space_variant is not None:
@@ -546,7 +566,7 @@ def _navigation_screen(image: Image.Image, rgb: np.ndarray) -> tuple[str, tuple[
             (round(target_x * image.width), round(target_y * image.height)),
             0.92 if out_of_space_variant == "live_bottom" else 0.98,
         )
-        return "out_of_space", (control,)
+        return "out_of_space", (control,), _out_of_space_substate(rgb)
 
     scores: list[tuple[float, str]] = []
     for name, reference in _NAVIGATION_REFERENCES.items():
@@ -565,14 +585,219 @@ def _navigation_screen(image: Image.Image, rgb: np.ndarray) -> tuple[str, tuple[
         (round(target_x * image.width), round(target_y * image.height)),
         round(similarity, 3),
     )
-    return reference["screen"], (control,)
+    return reference["screen"], (control,), None
+
+
+def _find_feed_outlet(hsv: np.ndarray) -> tuple[float, float, float] | None:
+    """Locate the central exit gate from its dark violet body and proportions."""
+    height, width = hsv.shape[:2]
+    x0, x1 = int(0.30 * width), int(0.70 * width)
+    y0, y1 = int(0.30 * height), int(0.48 * height)
+    crop = hsv[y0:y1, x0:x1]
+    mask = (
+        (crop[:, :, 0] >= 160)
+        & (crop[:, :, 0] <= 235)
+        & (crop[:, :, 1] >= 50)
+        & (crop[:, :, 2] <= 130)
+    )
+    candidates = []
+    for left, top, right, bottom, area in _components(mask):
+        box_width, box_height = right - left, bottom - top
+        center_x = x0 + (left + right) / 2
+        center_y = y0 + (top + bottom) / 2
+        if not (0.055 * width <= box_width <= 0.18 * width):
+            continue
+        if not (0.018 * height <= box_height <= 0.06 * height):
+            continue
+        if not (1.0 <= box_width / max(1, box_height) <= 3.2):
+            continue
+        if not (0.40 * width <= center_x <= 0.60 * width):
+            continue
+        if not (0.34 * height <= center_y <= 0.44 * height):
+            continue
+        fill = area / max(1, box_width * box_height)
+        candidates.append((fill, -abs(center_x - width / 2), center_x, y0 + top, box_width))
+    if not candidates:
+        return None
+    _, _, center_x, top, gate_width = max(candidates)
+    return center_x, float(top), float(gate_width)
+
+
+def _feed_patch_color(
+    hsv: np.ndarray,
+    center: tuple[float, float],
+    radius: int,
+) -> tuple[str | None, float]:
+    x, y = map(round, center)
+    height, width = hsv.shape[:2]
+    x0, x1 = max(0, x - radius), min(width, x + radius + 1)
+    y0, y1 = max(0, y - radius), min(height, y + radius + 1)
+    patch = hsv[y0:y1, x0:x1]
+    if patch.size == 0:
+        return None, 0.0
+
+    pixels = patch.reshape(-1, 3)
+    hue, saturation, value = pixels[:, 0], pixels[:, 1], pixels[:, 2]
+    white = (saturation < 38) & (value >= 195)
+    colors: dict[str, int] = {}
+    eligible = (saturation >= 50) & (value >= 75)
+    for pixel_hue, pixel_saturation, pixel_value in pixels[eligible]:
+        color, _ = _color_name(int(pixel_hue), int(pixel_saturation), int(pixel_value))
+        if color is not None:
+            colors[color] = colors.get(color, 0) + 1
+
+    total = len(pixels)
+    white_fraction = float(white.mean())
+    if white_fraction >= 0.42 and float(value.std()) >= 10.0:
+        return "white", round(min(0.94, 0.62 + white_fraction * 0.35), 3)
+    if not colors:
+        return None, 0.0
+    color, count = max(colors.items(), key=lambda item: item[1])
+    colored_fraction = count / max(1, int(eligible.sum()))
+    if colored_fraction < 0.62 or count / total < 0.28:
+        return None, round(colored_fraction, 3)
+    return color, round(min(0.96, 0.60 + colored_fraction * 0.34), 3)
+
+
+def _has_concealed_feed(hsv: np.ndarray) -> bool:
+    """Recognize question-mark conveyor columns without assigning their colors."""
+    height, width = hsv.shape[:2]
+    top = hsv[int(0.03 * height) : int(0.34 * height)]
+    side_columns = np.concatenate((
+        top[:, int(0.04 * width) : int(0.22 * width)],
+        top[:, int(0.78 * width) : int(0.96 * width)],
+    ), axis=1)
+    dark_beads = (side_columns[:, :, 1] < 80) & (side_columns[:, :, 2] < 90)
+    bright_question_marks = (side_columns[:, :, 1] < 70) & (side_columns[:, :, 2] > 210)
+    return float(dark_beads.mean()) >= 0.25 and float(bright_question_marks.mean()) >= 0.02
 
 
 def _read_feed(hsv: np.ndarray) -> FeedObservation:
-    # Queue direction and the entry point into the center loop are not yet
-    # calibrated across board layouts. Never promote a color patch near the
-    # screen edge into a current bead guess.
-    return FeedObservation(None, (), 0.0, "unresolved: conveyor outlet and center order")
+    """Read the bead at the visible outlet and a short, visible left approach."""
+    outlet = _find_feed_outlet(hsv)
+    if outlet is None:
+        if _has_concealed_feed(hsv):
+            return FeedObservation(
+                None,
+                (None,),
+                0.0,
+                "concealed conveyor region; current and upcoming colors unknown",
+            )
+        return FeedObservation(None, (), 0.0, "unresolved: outlet geometry not found")
+
+    outlet_x, gate_top, gate_width = outlet
+    bead_y = gate_top - gate_width * 0.105
+    bead_radius = max(4, round(gate_width * 0.045))
+    current, confidence = _feed_patch_color(hsv, (outlet_x, bead_y), bead_radius)
+    if current is None:
+        return FeedObservation(None, (), 0.0, "outlet found; bead color unresolved")
+
+    # The board's visible approach curves up and left from the exit gate.
+    # Temporal observations below verify that this is the advancing direction.
+    upcoming: list[str | None] = []
+    previous = current
+    relative_path = (
+        (0.0, 0.0),
+        (-0.80, -0.35),
+        (-1.43, -1.0),
+        (-1.55, -2.2),
+        (-1.40, -3.2),
+        (-0.75, -4.0),
+    )
+    waypoints = [
+        (outlet_x + x * gate_width, bead_y + y * gate_width)
+        for x, y in relative_path
+    ]
+    path_samples: list[tuple[float, float]] = []
+    for start, end in zip(waypoints, waypoints[1:]):
+        segment_length = float(np.hypot(end[0] - start[0], end[1] - start[1]))
+        sample_count = max(1, round(segment_length / (gate_width * 0.08)))
+        for index in range(sample_count):
+            fraction = index / sample_count
+            path_samples.append((
+                start[0] + (end[0] - start[0]) * fraction,
+                start[1] + (end[1] - start[1]) * fraction,
+            ))
+    path_samples.append(waypoints[-1])
+    sample_stride = max(1, round(gate_width * 0.16 / max(gate_width * 0.08, 1)))
+    misses = 0
+    for point_index in range(0, len(path_samples), sample_stride):
+        color, sample_confidence = _feed_patch_color(
+            hsv,
+            path_samples[point_index],
+            max(3, round(gate_width * 0.035)),
+        )
+        if color is None or sample_confidence < 0.55:
+            misses += 1
+            if upcoming and misses >= 3:
+                upcoming.append(None)
+                break
+            continue
+        misses = 0
+        if color != previous:
+            upcoming.append(color)
+            previous = color
+            if len([item for item in upcoming if item is not None]) >= 3:
+                upcoming.append(None)
+                break
+    if not upcoming or upcoming[-1] is not None:
+        upcoming.append(None)
+
+    return FeedObservation(
+        current,
+        tuple(upcoming),
+        confidence,
+        "visible outlet bead; left-approach lookahead pending temporal confirmation",
+    )
+
+
+class FeedTracker:
+    """Use successive outlet observations to verify the approach direction."""
+
+    def __init__(self) -> None:
+        self._previous: FeedObservation | None = None
+        self._direction: str | None = None
+        self._direction_confidence = 0.0
+
+    def observe(self, source: str | Path | Image.Image, state: GameState) -> GameState:
+        if state.screen != "game":
+            self._previous = None
+            self._direction = None
+            self._direction_confidence = 0.0
+            return state
+
+        image = source.copy() if isinstance(source, Image.Image) else Image.open(source)
+        image = image.convert("RGB")
+        if image.width < 400 or image.height < 800:
+            return state
+        hsv = np.asarray(image.convert("HSV"))
+        observed = state.feed
+        if observed.current is None:
+            observed = _read_feed(hsv)
+        if observed.current is None:
+            self._previous = None
+            return state
+
+        previous = self._previous
+        if previous is not None and previous.current != observed.current:
+            visible_ahead = [color for color in previous.upcoming if color is not None]
+            if visible_ahead and observed.current == visible_ahead[0]:
+                self._direction = "from_left_toward_outlet"
+                self._direction_confidence = 0.86
+            elif observed.current in visible_ahead:
+                self._direction = "from_left_toward_outlet"
+                self._direction_confidence = 0.70
+
+        if self._direction is not None:
+            observed = replace(
+                observed,
+                confidence=round(max(observed.confidence, self._direction_confidence), 3),
+                source=f"{observed.source}; temporal advancement confirmed from left",
+                direction=self._direction,
+                direction_confidence=self._direction_confidence,
+            )
+        self._previous = state.feed if state.feed.current is not None else observed
+        return replace(state, feed=observed)
 
 
 def analyze_frame(source: str | Path | Image.Image) -> GameState:
@@ -586,8 +811,9 @@ def analyze_frame(source: str | Path | Image.Image) -> GameState:
         tiles, locks = _find_tiles(rgb, hsv)
         screen = _screen_type(rgb, tiles)
         controls: tuple[ScreenControl, ...] = ()
+        modal_substate = None
     else:
-        screen, controls = navigation
+        screen, controls, modal_substate = navigation
         tiles, locks = (), ()
     if tiles:
         left = min(tile.bbox[0] for tile in tiles)
@@ -610,4 +836,5 @@ def analyze_frame(source: str | Path | Image.Image) -> GameState:
         locks=locks,
         warnings=warnings,
         controls=controls,
+        modal_substate=modal_substate,
     )

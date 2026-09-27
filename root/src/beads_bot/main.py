@@ -13,7 +13,7 @@ from .debug import save_debug_image
 from .input import tap
 from .policy import ActionCandidate, Decision, choose_move, rank_candidates
 from .recording import RunRecorder, classify_transition
-from .vision import analyze_frame
+from .vision import FeedTracker, analyze_frame
 
 
 _MAX_UNKNOWN_REOBSERVATIONS = 4
@@ -26,6 +26,7 @@ def _boxes_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int
 def _state_dict(state: GameState, decision: Decision, times: dict[str, float]) -> dict:
     return {
         "screen": state.screen,
+        "modal_substate": state.modal_substate,
         "difficulty": state.difficulty,
         "size": [state.width, state.height],
         "feed": asdict(state.feed),
@@ -96,6 +97,7 @@ def _state_dict(state: GameState, decision: Decision, times: dict[str, float]) -
 def _state_signature(state: GameState) -> tuple:
     return (
         state.screen,
+        state.modal_substate,
         state.feed.current,
         state.feed.upcoming,
         state.progress,
@@ -245,6 +247,10 @@ def run_live(
     max_moves = getattr(args, "max_moves", None)
     attempt_history: list[dict] = []
     last_finalized: dict | None = None
+    feed_tracker = FeedTracker()
+
+    def observe_frame(frame: CapturedFrame) -> GameState:
+        return feed_tracker.observe(frame.image, analyze_fn(frame.image))
 
     def finish_attempt(status: str, reason: str) -> dict:
         nonlocal last_finalized
@@ -269,7 +275,7 @@ def run_live(
 
     try:
         current_frame = capture_fn(args.adb, args.serial)
-        current_state = analyze_fn(current_frame.image)
+        current_state = observe_frame(current_frame)
     except Exception as error:
         return finish_attempt("device_error", f"initial capture failed: {error}")
 
@@ -286,7 +292,7 @@ def run_live(
                 try:
                     sleep_fn(max(0.0, args.settle_seconds))
                     next_frame = capture_fn(args.adb, args.serial)
-                    next_state = analyze_fn(next_frame.image)
+                    next_state = observe_frame(next_frame)
                 except Exception as error:
                     return recovery_incomplete(f"home screen re-observation failed: {error}")
                 unknown_reobservations = (
@@ -327,7 +333,7 @@ def run_live(
                 tap_fn(control.center[0], control.center[1], args.adb, args.serial)
                 sleep_fn(max(0.0, args.settle_seconds))
                 next_frame = capture_fn(args.adb, args.serial)
-                next_state = analyze_fn(next_frame.image)
+                next_state = observe_frame(next_frame)
             except Exception as error:
                 failed_attempt["session_status"] = "recovery_incomplete"
                 failed_attempt["session_reason"] = f"failure dismissal failed: {error}"
@@ -361,7 +367,7 @@ def run_live(
                 input_count += 1
                 sleep_fn(max(0.0, args.settle_seconds))
                 next_frame = capture_fn(args.adb, args.serial)
-                next_state = analyze_fn(next_frame.image)
+                next_state = observe_frame(next_frame)
             except Exception as error:
                 _record_observation(
                     recorder,
@@ -409,7 +415,7 @@ def run_live(
             try:
                 sleep_fn(max(0.0, args.settle_seconds))
                 next_frame = capture_fn(args.adb, args.serial)
-                next_state = analyze_fn(next_frame.image)
+                next_state = observe_frame(next_frame)
             except Exception as error:
                 _record_observation(
                     recorder, frame=frame, state=state,
@@ -458,7 +464,7 @@ def run_live(
                 input_count += 1
                 sleep_fn(max(0.0, args.settle_seconds))
                 next_frame = capture_fn(args.adb, args.serial)
-                next_state = analyze_fn(next_frame.image)
+                next_state = observe_frame(next_frame)
             except Exception as error:
                 _record_observation(
                     recorder, frame=frame, state=state, tap_point=control.center,
@@ -534,7 +540,7 @@ def run_live(
             action_count += 1
             sleep_fn(max(0.0, args.settle_seconds))
             next_frame = capture_fn(args.adb, args.serial)
-            next_state = analyze_fn(next_frame.image)
+            next_state = observe_frame(next_frame)
         except Exception as error:
             click_elapsed = (time.perf_counter() - click_started) * 1000
             _record_observation(

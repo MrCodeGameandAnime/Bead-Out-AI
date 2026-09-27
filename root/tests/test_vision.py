@@ -1,12 +1,13 @@
 from pathlib import Path
 import unittest
+from PIL import Image
 
-from beads_bot.vision import analyze_frame
+from beads_bot.vision import FeedTracker, analyze_frame
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "img"
-LEVEL60_FRAME = ROOT / "src" / "root" / "debug" / "before_001.png"
+LEVEL60_FRAME = SAMPLES / "before_001.png"
 
 
 class VisionSampleTests(unittest.TestCase):
@@ -39,12 +40,12 @@ class VisionSampleTests(unittest.TestCase):
         self.assertEqual(len(hidden), 4)
         self.assertTrue(all(tile.color is None for tile in hidden))
 
-    def test_right_conveyor_stays_unknown_until_its_outlet_is_calibrated(self):
+    def test_visible_level56_outlet_bead_is_read_directly(self):
         state = analyze_frame(SAMPLES / "level56_gameplay_large_grid.jpg")
 
-        self.assertIsNone(state.feed.current)
-        self.assertEqual(state.feed.confidence, 0.0)
-        self.assertIn("unresolved", state.feed.source)
+        self.assertEqual(state.feed.current, "green")
+        self.assertEqual(state.feed.upcoming[0], "yellow")
+        self.assertGreaterEqual(state.feed.confidence, 0.65)
 
     def test_hidden_right_conveyor_is_unknown_not_guessed(self):
         state = analyze_frame(SAMPLES / "level57_hidden_beads_special_tiles.png")
@@ -52,6 +53,13 @@ class VisionSampleTests(unittest.TestCase):
         self.assertIsNone(state.feed.current)
         self.assertLess(state.feed.confidence, 0.65)
         self.assertNotIn("top edge", state.feed.source)
+
+    def test_hidden_conveyor_lookahead_is_an_explicit_unknown_position(self):
+        state = analyze_frame(SAMPLES / "level57_hidden_beads_special_tiles.png")
+
+        self.assertIsNone(state.feed.current)
+        self.assertEqual(state.feed.upcoming, (None,))
+        self.assertIn("concealed", state.feed.source)
 
     def test_ice_special_tiles_remain_unknown_without_digit_ocr(self):
         state = analyze_frame(SAMPLES / "level57_hidden_beads_special_tiles.png")
@@ -123,10 +131,12 @@ class VisionSampleTests(unittest.TestCase):
         self.assertEqual(len(state.locks), 2)
         self.assertEqual(len(state.tiles), 19)
 
-    def test_live_level60_feed_stays_unknown_without_verified_outlet_read(self):
+    def test_live_level60_feed_reads_visible_outlet_bead(self):
         state = analyze_frame(LEVEL60_FRAME)
 
-        self.assertIsNone(state.feed.current)
+        self.assertEqual(state.feed.current, "pink")
+        self.assertEqual(state.feed.upcoming[:3], ("purple", "yellow", "orange"))
+        self.assertGreaterEqual(state.feed.confidence, 0.65)
         self.assertNotIn("top edge", state.feed.source)
 
     def test_level79_live_frame_matches_manual_rh_dnh_ground_truth(self):
@@ -161,6 +171,7 @@ class VisionSampleTests(unittest.TestCase):
         state = analyze_frame(SAMPLES / "failure_01.jpg")
 
         self.assertEqual(state.screen, "out_of_space")
+        self.assertEqual(state.modal_substate, "space_offer")
         self.assertEqual(
             [(control.kind, control.center) for control in state.controls],
             [("close", (639, 268))],
@@ -170,6 +181,7 @@ class VisionSampleTests(unittest.TestCase):
         state = analyze_frame(SAMPLES / "failure_02.jpg")
 
         self.assertEqual(state.screen, "out_of_space")
+        self.assertEqual(state.modal_substate, "life_warning")
         self.assertEqual(
             [(control.kind, control.center) for control in state.controls],
             [("close", (639, 268))],
@@ -179,10 +191,41 @@ class VisionSampleTests(unittest.TestCase):
         state = analyze_frame(SAMPLES / "level80_live_out_of_space.jpg")
 
         self.assertEqual(state.screen, "out_of_space")
+        self.assertEqual(state.modal_substate, "space_offer")
         self.assertEqual(
             [(control.kind, control.center) for control in state.controls],
             [("close", (540, 2273))],
         )
+
+    def test_raw_level80_offer_and_life_warning_pages_keep_distinct_substates(self):
+        offer = analyze_frame(SAMPLES / "level80_live_space_offer_page.jpg")
+        warning = analyze_frame(SAMPLES / "level80_live_life_warning_page.jpg")
+
+        self.assertEqual((offer.screen, offer.modal_substate), ("out_of_space", "space_offer"))
+        self.assertEqual((warning.screen, warning.modal_substate), ("out_of_space", "life_warning"))
+        self.assertEqual(offer.controls[0].kind, "close")
+        self.assertEqual(warning.controls[0].kind, "close")
+        self.assertEqual(offer.controls[0].center, warning.controls[0].center)
+
+    def test_level80_feed_reads_outlet_and_keeps_hidden_lookahead_unknown(self):
+        state = analyze_frame(SAMPLES / "level80_feed_before_action_01.jpg")
+
+        self.assertEqual(state.feed.current, "white")
+        self.assertEqual(state.feed.upcoming[:3], ("indigo", "pink", "orange"))
+        self.assertIn(None, state.feed.upcoming)
+        self.assertGreaterEqual(state.feed.confidence, 0.65)
+
+    def test_level80_temporal_feed_tracker_confirms_advancement_toward_outlet(self):
+        tracker = FeedTracker()
+        first_image = Image.open(SAMPLES / "level80_feed_before_action_01.jpg")
+        second_image = Image.open(SAMPLES / "level80_feed_before_action_02.jpg")
+        first_state = tracker.observe(first_image, analyze_frame(first_image))
+        second_state = tracker.observe(second_image, analyze_frame(second_image))
+
+        self.assertEqual(first_state.feed.current, "white")
+        self.assertEqual(second_state.feed.current, "indigo")
+        self.assertEqual(second_state.feed.direction, "from_left_toward_outlet")
+        self.assertGreater(second_state.feed.direction_confidence, 0.65)
 
     def test_annotated_level_failed_screen_exposes_only_its_marked_close_target(self):
         state = analyze_frame(SAMPLES / "failure_03.jpg")

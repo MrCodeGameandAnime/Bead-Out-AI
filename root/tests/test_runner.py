@@ -15,7 +15,7 @@ def _tile(tile_id, y, *, color="green", legality="RH", confidence=0.9):
     return Tile(tile_id, (20, y, 80, y + 60), color, legality, confidence, 0.9)
 
 
-def _state(tiles=(), *, screen="game", controls=()):
+def _state(tiles=(), *, screen="game", controls=(), modal_substate=None):
     tiles = tuple(tiles)
     board = None if not tiles else (
         min(tile.bbox[0] for tile in tiles),
@@ -31,6 +31,7 @@ def _state(tiles=(), *, screen="game", controls=()):
         board_region=board,
         feed=FeedObservation(None, (), 0.0, "unresolved"),
         controls=tuple(controls),
+        modal_substate=modal_substate,
     )
 
 
@@ -163,6 +164,34 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual(len(taps), 2)
         self.assertEqual(captures, 3)
         self.assertEqual(result["status"], "no_progress")
+
+    def test_out_of_space_page_transition_is_progress_but_repeated_page_is_no_change(self):
+        close = (ScreenControl("close", (90, 90), 0.99),)
+        offer = _state(screen="out_of_space", controls=close, modal_substate="space_offer")
+        warning = _state(screen="out_of_space", controls=close, modal_substate="life_warning")
+
+        self.assertNotEqual(main_module._state_signature(offer), main_module._state_signature(warning))
+        self.assertEqual(
+            main_module._control_transition_outcomes(offer, warning)[0].value,
+            "ACTION_ACCEPTED",
+        )
+        self.assertEqual(
+            main_module._control_transition_outcomes(warning, warning)[0].value,
+            "NO_CHANGE",
+        )
+
+        result, taps, _ = self._run([offer, warning, warning])
+        events = [
+            json.loads(line)
+            for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()
+        ]
+
+        self.assertEqual(taps, [(90, 90), (90, 90)])
+        self.assertEqual(result["status"], "no_progress")
+        self.assertEqual(
+            [event["outcomes"]["interaction"] for event in events],
+            ["ACTION_ACCEPTED", "NO_CHANGE"],
+        )
 
     def test_out_of_space_recovery_records_failure_then_starts_a_separate_attempt(self):
         game = _state([_tile("before-failure", 20)])

@@ -66,6 +66,7 @@ def _outcome(value) -> str:
 def _signature(state: GameState) -> tuple:
     return (
         state.screen,
+        state.modal_substate,
         state.feed.current,
         tuple(
             (tile.bbox, tile.color, tile.legality, tile.kind, tile.locked, tile.number)
