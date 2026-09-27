@@ -1,13 +1,12 @@
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 
-from .board import FeedObservation, GameState, Tile
+from .board import FeedObservation, GameState, LockMarker, Tile
 
 
-TILE_SEARCH_REGION = (0.05, 0.52, 0.95, 0.89)
-RIGHT_FEED_REGION = (0.86, 0.94)
+TILE_SEARCH_REGION = (0.05, 0.52, 0.89, 0.89)
 _PALETTE_HUES = {
     "red": (0, 255),
     "orange": (17, 255),
@@ -82,7 +81,14 @@ def _color_name(hue: int, saturation: int, value: int) -> tuple[str | None, floa
         name: min((hue - center) % 256, (center - hue) % 256)
         for name, center in centers.items()
     }
-    name = min(distances, key=distances.get)
+    # Resolve exact hue-boundary ties toward the higher-hue swatch. This keeps
+    # magenta-pink values from being labeled purple at the shared boundary.
+    name = min(distances, key=lambda candidate: (distances[candidate], -centers[candidate]))
+    # The game's blue and cyan swatches sit almost on the same hue bin in this
+    # render. Preserve their observed split at the boundary used by the live
+    # Level 60 reference instead of collapsing both into cyan.
+    if 140 <= hue <= 145:
+        name = "blue" if hue <= 142 else "cyan"
     confidence = max(0.4, min(0.97, 1.0 - distances[name] / 36.0))
     return name, confidence
 
@@ -139,12 +145,12 @@ def _rim_score(rgb: np.ndarray, box: tuple[int, int, int, int]) -> float:
 def _legality(rim_score: float) -> tuple[str, float]:
     if rim_score >= 0.22:
         return "RH", min(0.99, 0.68 + (rim_score - 0.22) * 0.8)
-    if rim_score <= 0.10:
-        return "DNH", min(0.96, 0.66 + (0.10 - rim_score) * 2.5)
+    if rim_score <= 0.14:
+        return "DNH", min(0.96, 0.66 + (0.14 - rim_score) * 2.5)
     return "UNKNOWN", 0.48
 
 
-def _find_tiles(rgb: np.ndarray, hsv: np.ndarray) -> tuple[Tile, ...]:
+def _find_tiles(rgb: np.ndarray, hsv: np.ndarray) -> tuple[tuple[Tile, ...], tuple[LockMarker, ...]]:
     height, width = hsv.shape[:2]
     rx0, ry0, rx1, ry1 = TILE_SEARCH_REGION
     x0, y0, x1, y1 = int(rx0 * width), int(ry0 * height), int(rx1 * width), int(ry1 * height)
@@ -168,10 +174,10 @@ def _find_tiles(rgb: np.ndarray, hsv: np.ndarray) -> tuple[Tile, ...]:
 
     # Very Hard boards can have a metal lock join two adjacent cube masks.
     # Recover the regular rows and columns from the cells that remain separate.
-    cells, lock_positions = _recover_grid_cells(hsv, candidates)
+    cells, lock_markers = _recover_grid_cells(hsv, candidates)
 
     tiles: list[Tile] = []
-    for index, (box, locked, number) in enumerate(cells, start=1):
+    for index, (box, has_special_value) in enumerate(cells, start=1):
         color, color_confidence, kind = _tile_color(hsv, box)
         relief_score = _rim_score(rgb, box)
         legality, relief_confidence = _legality(relief_score)
@@ -185,12 +191,11 @@ def _find_tiles(rgb: np.ndarray, hsv: np.ndarray) -> tuple[Tile, ...]:
                 legality=legality,
                 confidence=round(relief_confidence, 3),
                 color_confidence=round(color_confidence, 3),
-                kind="special" if number is not None else kind,
-                locked=locked,
-                number=number,
+                kind="special" if has_special_value else kind,
+                number=None,
             )
         )
-    return tuple(tiles)
+    return tuple(tiles), lock_markers
 
 
 def _cluster(values: list[float], tolerance: float) -> list[list[float]]:
@@ -218,13 +223,20 @@ def _cell_has_visual_evidence(
     if patch.size == 0:
         return False
     saturation, value = patch[:, :, 1], patch[:, :, 2]
-    colored = ((saturation >= 85) & (value >= 65)).mean()
-    neutral_body = ((saturation <= 55) & (value >= 65) & (value <= 235)).mean()
-    shadow = (value < 80).mean()
-    return colored >= 0.14 or neutral_body >= 0.18 or shadow >= 0.30
+    colored_body = ((saturation >= 85) & (value >= 65)).mean()
+    neutral_body = ((saturation <= 80) & (value >= 65) & (value <= 235)).mean()
+    value_spread = float(value.std())
+    textured = value_spread >= 8.0
+    # Saturated bead faces can remain visible even when a lock obscures their
+    # component boundary. Empty tray cells can be colorful too, but stay flat.
+    return (
+        colored_body >= 0.65
+        or (textured and colored_body >= 0.14)
+        or (value_spread >= 14.0 and neutral_body >= 0.18)
+    )
 
 
-def _numbered_tile(hsv: np.ndarray, box: tuple[int, int, int, int]) -> int | None:
+def _has_special_value_marking(hsv: np.ndarray, box: tuple[int, int, int, int]) -> bool:
     left, top, right, bottom = box
     width, height = right - left, bottom - top
     cx, cy = (left + right) / 2, (top + bottom) / 2
@@ -232,88 +244,140 @@ def _numbered_tile(hsv: np.ndarray, box: tuple[int, int, int, int]) -> int | Non
     y0, y1 = max(0, round(top + height * 0.08)), min(hsv.shape[0], round(top + height * 0.62))
     patch = hsv[y0:y1, x0:x1]
     if patch.size == 0:
-        return None
+        return False
     saturation, value = patch[:, :, 1], patch[:, :, 2]
-    white_ink = ((saturation < 90) & (value > 215)).mean()
-    dark_ink = (value < 75) & (saturation < 100)
-    ys, xs = np.where(dark_ink)
-    if white_ink < 0.20 or len(xs) < 30:
-        return None
-    ink_span = (int(xs.max()) - int(xs.min()) + 1) / patch.shape[1]
-    # The 200 ice tiles use three large dark outlined glyphs; Level 59 uses a
-    # single centered 2. Keep the recognizer conservative for other markings.
-    if ink_span >= 0.60:
-        return 200
-    if ink_span >= 0.18:
-        return 2
-    return None
+    white_glyph = ((saturation < 95) & (value > 215)).mean()
+    dark_outline = ((value < 100) & (saturation < 110)).mean()
+    return white_glyph >= 0.18 and dark_outline >= 0.018
 
 
-def _lock_columns(
+def _detect_lock_markers(
     hsv: np.ndarray,
     columns: list[float],
     rows: list[float],
-) -> set[tuple[int, int]]:
-    locked: set[tuple[int, int]] = set()
+    row_heights: list[float],
+) -> tuple[LockMarker, ...]:
+    markers: list[LockMarker] = []
     if len(columns) < 2:
-        return locked
+        return ()
     height, width = hsv.shape[:2]
     for row_index, row_center in enumerate(rows):
-        # Magnets sit across a cell seam and overlap the cell immediately to
-        # their right. Their silver loop is much brighter and more neutral than
-        # the pastel board behind them.
-        if not (0.66 * height <= row_center <= 0.82 * height):
-            continue
-        y0, y1 = max(0, round(row_center - 90)), max(1, round(row_center - 20))
+        row_height = row_heights[row_index]
         for column_index in range(len(columns) - 1):
             seam = (columns[column_index] + columns[column_index + 1]) / 2
             x0, x1 = max(0, round(seam - 28)), min(width, round(seam + 28))
-            patch = hsv[y0:y1, x0:x1]
-            if patch.size == 0:
+            silver_top = hsv[
+                max(0, round(row_center - row_height * 0.85)) : max(1, round(row_center - row_height * 0.18)),
+                x0:x1,
+            ]
+            gold_base = hsv[
+                max(0, round(row_center - row_height * 0.40)) : min(height, round(row_center + row_height * 0.05)),
+                x0:x1,
+            ]
+            if silver_top.size == 0 or gold_base.size == 0:
                 continue
-            silver = ((patch[:, :, 1] <= 70) & (patch[:, :, 2] >= 180)).mean()
-            if silver >= 0.30:
-                # The overlay is centered on the seam; the lock constrains the
-                # next cell, which it overlaps on the screenshot.
-                locked.add((row_index, column_index + 1))
-    return locked
+            # The light beige playfield also looks neutral and bright in HSV.
+            # Restrict the metal cue to its mid-tone body to reject that
+            # background and old text/box annotations around the cells.
+            silver = (
+                (silver_top[:, :, 1] <= 70)
+                & (silver_top[:, :, 2] >= 140)
+                & (silver_top[:, :, 2] <= 210)
+            ).mean()
+            gold = (
+                (gold_base[:, :, 0] >= 12)
+                & (gold_base[:, :, 0] <= 38)
+                & (gold_base[:, :, 1] >= 150)
+                & (gold_base[:, :, 2] >= 130)
+            ).mean()
+            if silver >= 0.18 and gold >= 0.24:
+                box = (
+                    max(0, round(seam - 44)),
+                    max(0, round(row_center - row_height * 0.65)),
+                    min(width, round(seam + 44)),
+                    min(height, round(row_center + row_height * 0.15)),
+                )
+                markers.append(
+                    LockMarker(
+                        id=f"lock-{len(markers) + 1:02d}",
+                        bbox=box,
+                        center=(round(seam), round(row_center - row_height * 0.30)),
+                        confidence=round(min(0.98, 0.65 + silver * 0.25 + gold * 0.25), 3),
+                    )
+                )
+    return tuple(markers)
 
 
 def _recover_grid_cells(
     hsv: np.ndarray,
     candidates: list[tuple[int, int, int, int]],
-) -> tuple[list[tuple[tuple[int, int, int, int], bool, int | None]], set[tuple[int, int]]]:
+) -> tuple[list[tuple[tuple[int, int, int, int], bool]], tuple[LockMarker, ...]]:
     if len(candidates) < 5:
-        return [(box, False, _numbered_tile(hsv, box)) for box in candidates], set()
+        return [(box, _has_special_value_marking(hsv, box)) for box in candidates], ()
 
     widths = [box[2] - box[0] for box in candidates]
     heights = [box[3] - box[1] for box in candidates]
     cell_width = float(np.median(widths))
     cell_height = float(np.median(heights))
-    x_tolerance = max(10.0, cell_width * 0.40)
-    x_groups = _cluster([(box[0] + box[2]) / 2 for box in candidates], x_tolerance)
-    columns = [float(np.median(group)) for group in x_groups]
-    if len(columns) < 5:
-        return [(box, False, _numbered_tile(hsv, box)) for box in candidates], set()
-    gaps = np.diff(columns)
-    spacing = float(np.median(gaps))
-    if spacing <= 0 or np.max(np.abs(gaps - spacing)) > spacing * 0.22:
-        return [(box, False, _numbered_tile(hsv, box)) for box in candidates], set()
+    x_centers = [(box[0] + box[2]) / 2 for box in candidates]
+    base_spacing = cell_width * 1.10
+    pair_spacing: list[float] = []
+    for index, first in enumerate(x_centers):
+        for second in x_centers[index + 1 :]:
+            gap = abs(second - first)
+            if gap < cell_width * 0.9:
+                continue
+            for multiples in range(1, 7):
+                spacing = gap / multiples
+                if cell_width * 0.95 <= spacing <= cell_width * 1.4:
+                    if abs(spacing - base_spacing) <= base_spacing * 0.16:
+                        pair_spacing.append(spacing)
+    if not pair_spacing:
+        return [(box, _has_special_value_marking(hsv, box)) for box in candidates], ()
+    spacing_groups = _cluster(pair_spacing, base_spacing * 0.05)
+    spacing = float(np.median(max(spacing_groups, key=len)))
+    if spacing <= 0:
+        return [(box, _has_special_value_marking(hsv, box)) for box in candidates], ()
+
+    phase_candidates = [center % spacing for center in x_centers]
+    tolerance_x = spacing * 0.22
+    phase_scores = []
+    for phase in phase_candidates:
+        residuals = [abs((center - phase + spacing / 2) % spacing - spacing / 2) for center in x_centers]
+        inliers = [residual for residual in residuals if residual <= tolerance_x]
+        phase_scores.append((len(inliers), -float(np.median(inliers)) if inliers else -spacing, phase))
+    _, _, phase = max(phase_scores)
+    column_indices = [round((center - phase) / spacing) for center in x_centers]
+    inlier_indices = [
+        column_index
+        for center, column_index in zip(x_centers, column_indices)
+        if abs(center - (phase + column_index * spacing)) <= tolerance_x
+    ]
+    if len(inlier_indices) < max(4, int(len(candidates) * 0.55)):
+        return [(box, _has_special_value_marking(hsv, box)) for box in candidates], ()
+    first_column, last_column = min(inlier_indices), max(inlier_indices)
+    if last_column - first_column + 1 < 3 or last_column - first_column + 1 > 8:
+        return [(box, _has_special_value_marking(hsv, box)) for box in candidates], ()
+    columns = [phase + index * spacing for index in range(first_column, last_column + 1)]
+    x_tolerance = spacing * 0.28
 
     y_tolerance = max(12.0, cell_height * 0.30)
     y_groups = _cluster([(box[1] + box[3]) / 2 for box in candidates], y_tolerance)
     rows = [float(np.median(group)) for group in y_groups]
     if len(rows) < 2:
-        return [(box, False, _numbered_tile(hsv, box)) for box in candidates], set()
+        return [(box, _has_special_value_marking(hsv, box)) for box in candidates], ()
 
-    locked_cells = _lock_columns(hsv, columns, rows)
-    cells: list[tuple[tuple[int, int, int, int], bool, int | None]] = []
+    row_heights: list[float] = []
+    for row_center in rows:
+        row_boxes = [box for box in candidates if abs((box[1] + box[3]) / 2 - row_center) <= y_tolerance]
+        row_heights.append(float(np.median([box[3] - box[1] for box in row_boxes])) if row_boxes else cell_height)
+    lock_markers = _detect_lock_markers(hsv, columns, rows, row_heights)
+    cells: list[tuple[tuple[int, int, int, int], bool]] = []
     for row_index, row_center in enumerate(rows):
         row_boxes = [
             box for box in candidates
             if abs((box[1] + box[3]) / 2 - row_center) <= y_tolerance
         ]
-        row_has_number = any(_numbered_tile(hsv, box) is not None for box in row_boxes)
         row_height = float(np.median([box[3] - box[1] for box in row_boxes])) if row_boxes else cell_height
         used: set[int] = set()
         for column_index, column_center in enumerate(columns):
@@ -327,10 +391,6 @@ def _recover_grid_cells(
                     continue
                 used.add(id(box))
             else:
-                # Numbered mechanics form deliberately sparse rows. Do not
-                # mistake the surrounding tray and shadows for extra cubes.
-                if row_has_number:
-                    continue
                 if not _cell_has_visual_evidence(hsv, (column_center, row_center), cell_width, row_height):
                     continue
                 box = (
@@ -339,13 +399,12 @@ def _recover_grid_cells(
                     round(column_center + cell_width / 2),
                     round(row_center + row_height / 2),
                 )
-            locked = (row_index, column_index) in locked_cells
-            cells.append((box, locked, _numbered_tile(hsv, box)))
+            cells.append((box, _has_special_value_marking(hsv, box)))
 
     # If the geometry did not form a usable lattice, keep all original masks.
     if len(cells) < len(candidates):
-        return [(box, False, _numbered_tile(hsv, box)) for box in candidates], set()
-    return cells, locked_cells
+        return [(box, _has_special_value_marking(hsv, box)) for box in candidates], ()
+    return cells, lock_markers
 
 
 def _read_difficulty(rgb: np.ndarray) -> str | None:
@@ -380,47 +439,19 @@ def _screen_type(rgb: np.ndarray, tiles: tuple[Tile, ...]) -> str:
 
 
 def _read_feed(hsv: np.ndarray) -> FeedObservation:
-    height, width = hsv.shape[:2]
-    x0, x1 = int(RIGHT_FEED_REGION[0] * width), int(RIGHT_FEED_REGION[1] * width)
-    bands: list[str | None] = []
-    coverage: list[float] = []
-    for start_ratio, end_ratio in ((0.0, 0.02), (0.02, 0.04), (0.04, 0.06)):
-        patch = hsv[int(start_ratio * height) : max(int(end_ratio * height), 1), x0:x1]
-        if patch.size == 0:
-            continue
-        hue, saturation, value = patch[:, :, 0].ravel(), patch[:, :, 1].ravel(), patch[:, :, 2].ravel()
-        colored = (saturation > 150) & (value > 90)
-        coverage.append(float(colored.mean()))
-        if coverage[-1] >= 0.12:
-            histogram = np.bincount((hue[colored] // 5).astype(np.int32), minlength=52)
-            color, _ = _color_name(int(np.argmax(histogram) * 5), 220, int(np.median(value[colored])))
-            bands.append(color)
-        elif float((value < 72).mean()) >= 0.30:
-            bands.append(None)
-        else:
-            bands.append(None)
-
-    current = bands[0] if bands else None
-    if current is None:
-        return FeedObservation(None, tuple(bands[1:]), 0.0, "right conveyor (top edge)")
-
-    upcoming: list[str | None] = []
-    previous = current
-    for color in bands[1:]:
-        if color != previous:
-            upcoming.append(color)
-            previous = color
-    confidence = min(0.97, 0.65 + (coverage[0] if coverage else 0.0) * 0.35)
-    return FeedObservation(current, tuple(upcoming), round(confidence, 3), "right conveyor (top edge)")
+    # Queue direction and the entry point into the center loop are not yet
+    # calibrated across board layouts. Never promote a color patch near the
+    # screen edge into a current bead guess.
+    return FeedObservation(None, (), 0.0, "unresolved: conveyor outlet and center order")
 
 
 def analyze_frame(source: str | Path | Image.Image) -> GameState:
-    """Read game tiles and the first visible color on conveyor 1."""
+    """Read visible board cells and conservative game-state observations."""
     image = source.copy() if isinstance(source, Image.Image) else Image.open(source)
     image = image.convert("RGB")
     rgb = np.asarray(image)
     hsv = np.asarray(image.convert("HSV"))
-    tiles = _find_tiles(rgb, hsv)
+    tiles, locks = _find_tiles(rgb, hsv)
     screen = _screen_type(rgb, tiles)
     if tiles:
         left = min(tile.bbox[0] for tile in tiles)
@@ -439,5 +470,6 @@ def analyze_frame(source: str | Path | Image.Image) -> GameState:
         board_region=board_region,
         feed=_read_feed(hsv),
         difficulty=_read_difficulty(rgb),
+        locks=locks,
         warnings=warnings,
     )

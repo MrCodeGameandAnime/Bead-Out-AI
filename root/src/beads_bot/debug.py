@@ -27,28 +27,31 @@ def save_debug_image(
     font = ImageFont.load_default()
     selected_id = decision.tile.id if decision and decision.tile else None
 
+    for marker in state.locks:
+        center_x, center_y = marker.center
+        left, top, right, bottom = center_x - 38, center_y - 45, center_x + 38, center_y + 55
+        draw.rectangle((left, top, right, bottom), outline=(255, 190, 45, 255), width=5)
+
     for tile in state.tiles:
         color = (175, 80, 230, 255) if tile.locked else _STATUS_COLORS.get(tile.legality, _STATUS_COLORS["UNKNOWN"])
         left, top, right, bottom = tile.bbox
-        width = 5 if tile.id == selected_id else 3
-        draw.rectangle((left, top, right, bottom), outline=color, width=width)
-        labels = [tile.color or tile.kind, tile.legality, f"{tile.confidence:.2f}"]
-        if tile.locked:
-            labels.append("LOCK")
-        if tile.number is not None:
-            labels.append(str(tile.number))
-        text = " ".join(labels)
-        bounds = draw.textbbox((0, 0), text, font=font)
-        text_width = bounds[2] - bounds[0]
+        border_width = 5 if tile.id == selected_id else 3
+        short_id = tile.id.rsplit("-", 1)[-1]
+        text = f"{short_id} VALUE UNKNOWN" if tile.kind == "special" and tile.number is None else (
+            f"{short_id} {tile.color or tile.kind} {tile.legality}"
+        )
         label_top = max(0, top - 15)
-        draw.rectangle((left, label_top, left + text_width + 6, label_top + 14), fill=(18, 24, 37, 215))
-        draw.text((left + 3, label_top + 2), text, fill=(255, 255, 255, 255), font=font)
+        # Repaint the old label strip and its few pixels of overlap into the
+        # tile so older detector labels do not compete with this regression.
+        draw.rectangle((left, label_top, right, min(bottom, top + 18)), fill=(18, 24, 37, 235))
+        draw.text((left + 2, label_top + 2), text, fill=(255, 255, 255, 255), font=font)
+        draw.rectangle((left, top, right, bottom), outline=color, width=border_width)
 
     feed = state.feed.current if state.feed.current is not None else "unknown"
-    summary = f"{state.screen} | feed 1: {feed} ({state.feed.confidence:.2f})"
+    summary = f"{state.screen} | feed 1: {feed} ({state.feed.confidence:.2f}) | {state.feed.source}"
     if state.difficulty:
         summary += f" | {state.difficulty}"
-    draw.rectangle((8, 8, min(image.width - 8, 440), 30), fill=(18, 24, 37, 220))
+    draw.rectangle((8, 8, min(image.width - 8, 760), 30), fill=(18, 24, 37, 220))
     draw.text((14, 14), summary, fill=(255, 255, 255, 255), font=font)
     if decision is not None:
         decision_text = decision.reason if decision.tile is None else (

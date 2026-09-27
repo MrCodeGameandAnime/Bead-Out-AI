@@ -30,6 +30,14 @@ class Tile:
 
 
 @dataclass(frozen=True)
+class LockMarker:
+    id: str
+    bbox: tuple[int, int, int, int]
+    center: tuple[int, int]
+    confidence: float
+
+
+@dataclass(frozen=True)
 class GameState:
     screen: str
     width: int
@@ -38,4 +46,5 @@ class GameState:
     board_region: tuple[int, int, int, int] | None
     feed: FeedObservation
     difficulty: str | None = None
+    locks: tuple[LockMarker, ...] = ()
     warnings: tuple[str, ...] = ()

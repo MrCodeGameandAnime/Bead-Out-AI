@@ -3,6 +3,10 @@ from dataclasses import dataclass
 from .board import GameState, Tile
 
 
+def _overlaps(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> bool:
+    return first[0] < second[2] and second[0] < first[2] and first[1] < second[3] and second[1] < first[3]
+
+
 @dataclass(frozen=True)
 class Decision:
     tile: Tile | None
@@ -19,7 +23,10 @@ def choose_move(state: GameState) -> Decision:
     matches = [
         tile
         for tile in state.tiles
-        if tile.legality == "RH" and tile.color == state.feed.current and not tile.locked
+        if tile.legality == "RH"
+        and tile.color == state.feed.current
+        and not tile.locked
+        and not any(_overlaps(tile.bbox, lock.bbox) for lock in state.locks)
     ]
     if not matches:
         return Decision(None, f"no visibly raised {state.feed.current} tile is available", 0.0)

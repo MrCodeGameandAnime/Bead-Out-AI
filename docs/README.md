@@ -1,6 +1,6 @@
 # Beads Out local agent
 
-Small Windows prototype using Pillow and NumPy for classical image processing. It detects the visible board, cube colors, raised/depressed relief, locked pieces, numbered special tiles, the visible right-hand feed, and a conservative next move. No model downloads or game modification are used.
+Small Windows prototype using Pillow and NumPy for classical image processing. It detects the visible board, cube colors, raised/depressed relief, independent lock markers, and special tiles. Feed order and special-tile values remain unknown until they can be read reliably. No model downloads or game modification are used.
 
 ## Install
 
@@ -41,9 +41,9 @@ Use `--serial DEVICE_SERIAL` if multiple phones are connected. Use `--adb C:\pat
 
 ## Current evidence and limits
 
-The detector has been exercised against the screenshots in `root/img/`. On Level 59 it finds 20 cells, six raised cells, two locked pieces, two `2` tiles, and the `Very Hard` badge. It also identifies the Level 57 ice tiles marked `200`, while leaving the hidden cubes' colors unknown. The RH/DNH score uses the bright neutral rim around each box, not its color.
+The detector has been exercised against the screenshots in `root/img/` and the Level 60 regression frame in `root/debug/before_001.png`. It recovers cells on the grid lattice when a lock obscures component boundaries, and reports lock markers separately from cells. Special tiles are identified while their values stay `UNKNOWN` because digit recognition is not reliable enough to report a number. The feed stays unknown until the conveyor outlet and center order are calibrated. The RH/DNH score uses the bright neutral rim around each box, not its color.
 
-The current feed reader recognizes visible leading beads on the right conveyor; when that conveyor is hidden it abstains. Its upcoming-color read is a simple sample heuristic and has not been validated on a live phone. Grid recovery assumes mostly regular rows and columns. Difficulty recognition currently covers the centered `Very Hard` badge shown in the supplied sample. Completion/failure screens are not advanced automatically.
+Feed recognition remains unresolved, including when beads are visible, and the move policy abstains while the current bead is unknown. Grid recovery assumes mostly regular rows and columns. Difficulty recognition currently covers the centered `Very Hard` badge shown in the supplied samples. Completion/failure screens are not advanced automatically.
 
 Live capture, tap verification, sustained level completion, and throughput remain unverified because no ADB device was connected during this pass. Run the live command once the phone is available; use the saved before/after frames and timing fields to validate the hardware gates.
 

@@ -13,6 +13,10 @@ from .policy import Decision, choose_move
 from .vision import analyze_frame
 
 
+def _boxes_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> bool:
+    return first[0] < second[2] and second[0] < first[2] and first[1] < second[3] and second[1] < first[3]
+
+
 def _state_dict(state, decision: Decision, times: dict[str, float]) -> dict:
     return {
         "screen": state.screen,
@@ -20,6 +24,15 @@ def _state_dict(state, decision: Decision, times: dict[str, float]) -> dict:
         "size": [state.width, state.height],
         "feed": asdict(state.feed),
         "board_region": state.board_region,
+        "locks": [
+            {
+                **asdict(lock),
+                "overlapping_tile_ids": [
+                    tile.id for tile in state.tiles if _boxes_overlap(tile.bbox, lock.bbox)
+                ],
+            }
+            for lock in state.locks
+        ],
         "warnings": list(state.warnings),
         "tiles": [
             {
@@ -30,8 +43,13 @@ def _state_dict(state, decision: Decision, times: dict[str, float]) -> dict:
                 "kind": tile.kind,
                 "legality": tile.legality,
                 "confidence": tile.confidence,
+                "color_confidence": tile.color_confidence,
                 "locked": tile.locked,
+                "lock_marker_ids": [
+                    lock.id for lock in state.locks if _boxes_overlap(tile.bbox, lock.bbox)
+                ],
                 "number": tile.number,
+                "value_status": "UNKNOWN" if tile.kind == "special" and tile.number is None else None,
             }
             for tile in state.tiles
         ],
@@ -50,6 +68,7 @@ def _signature(state) -> tuple:
         state.screen,
         state.feed.current,
         tuple((tile.center, tile.color, tile.legality, tile.locked, tile.number) for tile in state.tiles),
+        tuple((lock.center, lock.bbox) for lock in state.locks),
     )
 
 
@@ -71,7 +90,9 @@ def run_offline(image_path: Path, debug_dir: Path | None) -> dict:
         "click": 0.0,
         "total": round((time.perf_counter() - started) * 1000, 2),
     }
-    return _state_dict(state, decision, times)
+    report = _state_dict(state, decision, times)
+    report["execution"] = "offline: no input sent"
+    return report
 
 
 def run_live(args: argparse.Namespace) -> list[dict]:
