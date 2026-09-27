@@ -26,6 +26,10 @@ def save_debug_image(
     draw = ImageDraw.Draw(overlay)
     font = ImageFont.load_default()
     selected_id = decision.tile.id if decision and decision.tile else None
+    candidate_ranks = {
+        candidate.tile.id: rank
+        for rank, candidate in enumerate(decision.candidates, start=1)
+    } if decision else {}
 
     for marker in state.locks:
         center_x, center_y = marker.center
@@ -37,8 +41,10 @@ def save_debug_image(
         left, top, right, bottom = tile.bbox
         border_width = 5 if tile.id == selected_id else 3
         short_id = tile.id.rsplit("-", 1)[-1]
-        text = f"{short_id} {tile.legality} value unknown" if tile.kind == "special" and tile.number is None else (
-            f"{short_id} {tile.color or tile.kind} {tile.legality}"
+        rank = candidate_ranks.get(tile.id)
+        rank_label = f"#{rank} " if rank is not None else ""
+        text = f"{rank_label}{short_id} {tile.legality} value unknown" if tile.kind == "special" and tile.number is None else (
+            f"{rank_label}{short_id} {tile.color or tile.kind} {tile.legality}"
         )
         label_top = max(0, top - 15)
         # Repaint the old label strip and its few pixels of overlap into the
@@ -54,8 +60,10 @@ def save_debug_image(
     draw.rectangle((8, 8, min(image.width - 8, 760), 30), fill=(18, 24, 37, 220))
     draw.text((14, 14), summary, fill=(255, 255, 255, 255), font=font)
     if decision is not None:
+        score = decision.candidates[0].score if decision.candidates else decision.confidence
         decision_text = decision.reason if decision.tile is None else (
-            f"SELECT {decision.tile.color} at {decision.tile.center}; confidence {decision.confidence:.2f}"
+            f"SELECT {decision.tile.color} at {decision.tile.center}; confidence {decision.confidence:.2f}; "
+            f"score {score:.2f}"
         )
         draw.rectangle((8, 34, min(image.width - 8, 680), 56), fill=(18, 24, 37, 220))
         draw.text((14, 40), decision_text[:100], fill=(255, 255, 255, 255), font=font)

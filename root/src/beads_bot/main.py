@@ -3,13 +3,16 @@ import json
 import time
 from dataclasses import asdict
 from pathlib import Path
+from typing import Callable
 
 from PIL import Image
 
-from .capture import capture_frame
+from .board import GameState, InteractionOutcome, ScreenControl, StrategicOutcome
+from .capture import CapturedFrame, capture_frame
 from .debug import save_debug_image
 from .input import tap
-from .policy import Decision, choose_move
+from .policy import ActionCandidate, Decision, choose_move, rank_candidates
+from .recording import RunRecorder, classify_transition
 from .vision import analyze_frame
 
 
@@ -17,7 +20,7 @@ def _boxes_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int
     return first[0] < second[2] and second[0] < first[2] and first[1] < second[3] and second[1] < first[3]
 
 
-def _state_dict(state, decision: Decision, times: dict[str, float]) -> dict:
+def _state_dict(state: GameState, decision: Decision, times: dict[str, float]) -> dict:
     return {
         "screen": state.screen,
         "difficulty": state.difficulty,
@@ -59,16 +62,46 @@ def _state_dict(state, decision: Decision, times: dict[str, float]) -> dict:
             "reason": decision.reason,
             "confidence": decision.confidence,
         },
+        "candidates": [
+            {
+                "rank": rank,
+                "key": candidate.key,
+                "tile_id": candidate.tile.id,
+                "center": candidate.tile.center,
+                "color": candidate.tile.color,
+                "kind": candidate.tile.kind,
+                "legality": candidate.tile.legality,
+                "score": candidate.score,
+                "confidence": candidate.confidence,
+                "context": {
+                    "mechanic_id": candidate.context.mechanic_id,
+                    "features": candidate.context.features,
+                },
+                "requirements": [asdict(requirement) for requirement in candidate.requirements],
+                "assumptions": list(candidate.assumptions),
+            }
+            for rank, candidate in enumerate(decision.candidates, start=1)
+        ],
+        "outcomes": {
+            "interaction": InteractionOutcome.NOT_ATTEMPTED.value,
+            "strategic": StrategicOutcome.UNKNOWN.value,
+        },
         "timings_ms": times,
     }
 
 
-def _signature(state) -> tuple:
+def _state_signature(state: GameState) -> tuple:
     return (
         state.screen,
         state.feed.current,
-        tuple((tile.center, tile.color, tile.legality, tile.locked, tile.number) for tile in state.tiles),
-        tuple((lock.center, lock.bbox) for lock in state.locks),
+        state.feed.upcoming,
+        state.progress,
+        tuple(
+            (tile.id, tile.bbox, tile.color, tile.legality, tile.kind, tile.locked, tile.number)
+            for tile in state.tiles
+        ),
+        tuple((lock.id, lock.center, lock.bbox) for lock in state.locks),
+        tuple((control.kind, control.center, control.cost, control.requires_ad) for control in state.controls),
     )
 
 
@@ -95,73 +128,256 @@ def run_offline(image_path: Path, debug_dir: Path | None) -> dict:
     return report
 
 
-def run_live(args: argparse.Namespace) -> list[dict]:
-    results: list[dict] = []
-    max_moves = args.max_moves if args.loop else 1
-    for move_number in range(1, max_moves + 1):
-        total_started = time.perf_counter()
-        frame = capture_frame(args.adb, args.serial)
-        vision_started = time.perf_counter()
-        state = analyze_frame(frame.image)
-        vision_ms = (time.perf_counter() - vision_started) * 1000
+def _terminal_summary(recorder: RunRecorder, status: str, reason: str, action_count: int, input_count: int) -> dict:
+    manifest_path = recorder.finish(status, reason)
+    return {
+        "run_id": recorder.run_id,
+        "status": status,
+        "reason": reason,
+        "action_count": action_count,
+        "input_count": input_count,
+        "run_dir": str(recorder.run_dir.resolve()),
+        "events_path": str(recorder.events_path.resolve()),
+        "manifest_path": str(manifest_path.resolve()),
+        "execution": "live: input sent" if input_count else "live: no input sent",
+    }
+
+
+def _record_observation(
+    recorder: RunRecorder,
+    *,
+    frame: Image.Image,
+    state: GameState,
+    candidates: tuple[ActionCandidate, ...] = (),
+    chosen: ActionCandidate | None = None,
+    tap_point: tuple[int, int] | None = None,
+    after_state: GameState | None = None,
+    after_frame: Image.Image | None = None,
+    interaction: InteractionOutcome = InteractionOutcome.NOT_ATTEMPTED,
+    strategic: StrategicOutcome = StrategicOutcome.IN_PROGRESS,
+    timings: dict[str, float] | None = None,
+) -> str:
+    return recorder.record_step(
+        before_state=state,
+        before_frame=frame,
+        candidates=candidates,
+        chosen=chosen,
+        tap=tap_point,
+        after_state=after_state,
+        after_frame=after_frame,
+        interaction_outcome=interaction,
+        strategic_outcome=strategic,
+        timings_ms=timings or {},
+        uncertain_assumptions=chosen.assumptions if chosen else (),
+    )
+
+
+def _safe_continue(state: GameState) -> ScreenControl | None:
+    safe = [
+        control for control in state.controls
+        if control.kind == "continue"
+        and control.cost is None
+        and not control.requires_ad
+        and control.confidence >= 0.7
+    ]
+    return max(safe, key=lambda control: control.confidence, default=None)
+
+
+def run_live(
+    args: argparse.Namespace,
+    *,
+    capture_fn: Callable = capture_frame,
+    tap_fn: Callable = tap,
+    analyze_fn: Callable = analyze_frame,
+    recorder_factory: Callable = RunRecorder.create,
+    sleep_fn: Callable = time.sleep,
+) -> dict:
+    """Run continuously when enabled; injected I/O keeps the loop testable offline."""
+    debug_root = args.debug_dir or Path("root/debug")
+    recorder = recorder_factory(debug_root / "runs", debug_root / "mechanic_evidence.jsonl")
+    action_count = 0
+    input_count = 0
+    max_moves = getattr(args, "max_moves", None)
+
+    try:
+        current_frame = capture_fn(args.adb, args.serial)
+        current_state = analyze_fn(current_frame.image)
+    except Exception as error:
+        return _terminal_summary(recorder, "device_error", f"initial capture failed: {error}", action_count, input_count)
+
+    attempted: set[str] = set()
+    active_signature: tuple | None = None
+    while True:
+        state = current_state
+        frame = current_frame.image
+        signature = _state_signature(state)
+        if signature != active_signature:
+            attempted.clear()
+            active_signature = signature
+
+        if state.screen == "failure":
+            _record_observation(
+                recorder, frame=frame, state=state,
+                interaction=InteractionOutcome.NOT_ATTEMPTED,
+                strategic=StrategicOutcome.LEVEL_FAILURE,
+            )
+            return _terminal_summary(recorder, "failure", "confirmed failure screen", action_count, input_count)
+        if state.screen not in ("game", "complete"):
+            _record_observation(
+                recorder, frame=frame, state=state,
+                interaction=InteractionOutcome.NOT_ATTEMPTED,
+                strategic=StrategicOutcome.UNKNOWN,
+            )
+            return _terminal_summary(recorder, "unrecognized_ui", "screen could not be recognized", action_count, input_count)
+
+        if state.screen == "complete":
+            control = _safe_continue(state)
+            if not args.execute or control is None:
+                reason = "level completed; no recognized free non-ad continuation" if control is None else "level completed; execution is disabled"
+                _record_observation(
+                    recorder, frame=frame, state=state,
+                    interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.LEVEL_SUCCESS,
+                )
+                return _terminal_summary(recorder, "success", reason, action_count, input_count)
+            try:
+                click_ms = tap_fn(control.center[0], control.center[1], args.adb, args.serial)
+                input_count += 1
+                sleep_fn(max(0.0, args.settle_seconds))
+                next_frame = capture_fn(args.adb, args.serial)
+                next_state = analyze_fn(next_frame.image)
+            except Exception as error:
+                _record_observation(
+                    recorder, frame=frame, state=state, tap_point=control.center,
+                    interaction=InteractionOutcome.UNKNOWN,
+                    strategic=StrategicOutcome.LEVEL_SUCCESS,
+                    timings={"tap": 0.0},
+                )
+                return _terminal_summary(recorder, "device_error", f"continuation action failed: {error}", action_count, input_count)
+            changed = _state_signature(state) != _state_signature(next_state)
+            _record_observation(
+                recorder,
+                frame=frame,
+                state=state,
+                tap_point=control.center,
+                after_state=next_state,
+                after_frame=next_frame.image,
+                interaction=InteractionOutcome.ACTION_ACCEPTED if changed else InteractionOutcome.NO_CHANGE,
+                strategic=StrategicOutcome.LEVEL_SUCCESS,
+                timings={"tap": float(click_ms), "verify_capture": next_frame.elapsed_ms},
+            )
+            if next_state.screen == "game":
+                current_frame, current_state = next_frame, next_state
+                attempted.clear()
+                active_signature = None
+                continue
+            if next_state.screen == "failure":
+                current_frame, current_state = next_frame, next_state
+                continue
+            if next_state.screen == "unknown":
+                current_frame, current_state = next_frame, next_state
+                continue
+            return _terminal_summary(
+                recorder,
+                "success",
+                "level completed; continuation did not leave the completion screen",
+                action_count,
+                input_count,
+            )
+
         policy_started = time.perf_counter()
-        decision = choose_move(state)
-        policy_ms = (time.perf_counter() - policy_started) * 1000
-        record = _state_dict(
+        candidates = rank_candidates(
             state,
-            decision,
-            {"capture": frame.elapsed_ms, "vision": round(vision_ms, 2), "policy": round(policy_ms, 2), "click": 0.0},
+            attempted=frozenset(attempted),
+            evidence_for=recorder.evidence_for,
         )
-        if args.debug_dir:
-            save_debug_image(frame.image, state, args.debug_dir / f"before_{move_number:03d}.png", decision)
+        policy_ms = (time.perf_counter() - policy_started) * 1000
+        if not candidates:
+            _record_observation(
+                recorder, frame=frame, state=state,
+                interaction=InteractionOutcome.NOT_ATTEMPTED,
+                strategic=StrategicOutcome.IN_PROGRESS,
+                timings={"policy": round(policy_ms, 2)},
+            )
+            reason = "no plausible action" if not attempted else "all distinct candidates had no change for this state"
+            return _terminal_summary(recorder, "no_progress", reason, action_count, input_count)
 
-        if decision.tile is None or decision.confidence < args.min_confidence:
-            record["execution"] = "paused: no sufficiently confident legal move"
-            pause_dir = args.debug_dir or Path("debug")
-            save_debug_image(frame.image, state, pause_dir / f"paused_{move_number:03d}.png", decision)
-            record["timings_ms"]["total"] = round((time.perf_counter() - total_started) * 1000, 2)
-            results.append(record)
-            break
+        chosen = candidates[0]
         if not args.execute:
-            record["execution"] = "dry-run: no input sent"
-            record["timings_ms"]["total"] = round((time.perf_counter() - total_started) * 1000, 2)
-            results.append(record)
-            break
+            _record_observation(
+                recorder, frame=frame, state=state, candidates=candidates, chosen=chosen,
+                interaction=InteractionOutcome.NOT_ATTEMPTED,
+                strategic=StrategicOutcome.IN_PROGRESS,
+                timings={"policy": round(policy_ms, 2)},
+            )
+            return _terminal_summary(recorder, "dry_run", "execution is disabled", action_count, input_count)
+        if max_moves is not None and action_count >= max_moves:
+            _record_observation(
+                recorder, frame=frame, state=state, candidates=candidates, chosen=chosen,
+                interaction=InteractionOutcome.NOT_ATTEMPTED,
+                strategic=StrategicOutcome.IN_PROGRESS,
+                timings={"policy": round(policy_ms, 2)},
+            )
+            return _terminal_summary(recorder, "move_limit", "user move limit reached", action_count, input_count)
 
-        x, y = decision.tile.center
-        record["timings_ms"]["click"] = tap(x, y, args.adb, args.serial)
-        time.sleep(max(0.0, args.settle_seconds))
-        after_frame = capture_frame(args.adb, args.serial)
-        verify_vision_started = time.perf_counter()
-        after_state = analyze_frame(after_frame.image)
-        record["timings_ms"]["verify_capture"] = after_frame.elapsed_ms
-        record["timings_ms"]["verify_vision"] = round((time.perf_counter() - verify_vision_started) * 1000, 2)
-        record["verification"] = {
-            "changed": _signature(state) != _signature(after_state),
-            "after_screen": after_state.screen,
-            "after_tile_count": len(after_state.tiles),
-        }
-        record["timings_ms"]["total"] = round((time.perf_counter() - total_started) * 1000, 2)
-        if args.debug_dir:
-            save_debug_image(after_frame.image, after_state, args.debug_dir / f"after_{move_number:03d}.png")
-        results.append(record)
-        if not record["verification"]["changed"] or after_state.screen != "game":
-            break
-    return results
+        click_started = time.perf_counter()
+        try:
+            click_ms = tap_fn(chosen.tile.center[0], chosen.tile.center[1], args.adb, args.serial)
+            input_count += 1
+            action_count += 1
+            sleep_fn(max(0.0, args.settle_seconds))
+            next_frame = capture_fn(args.adb, args.serial)
+            next_state = analyze_fn(next_frame.image)
+        except Exception as error:
+            click_elapsed = (time.perf_counter() - click_started) * 1000
+            _record_observation(
+                recorder,
+                frame=frame,
+                state=state,
+                candidates=candidates,
+                chosen=chosen,
+                tap_point=chosen.tile.center,
+                interaction=InteractionOutcome.UNKNOWN,
+                strategic=StrategicOutcome.UNKNOWN,
+                timings={"policy": round(policy_ms, 2), "tap_and_capture": round(click_elapsed, 2)},
+            )
+            return _terminal_summary(recorder, "device_error", f"action execution failed: {error}", action_count, input_count)
+
+        interaction, strategic = classify_transition(state, next_state, chosen)
+        _record_observation(
+            recorder,
+            frame=frame,
+            state=state,
+            candidates=candidates,
+            chosen=chosen,
+            tap_point=chosen.tile.center,
+            after_state=next_state,
+            after_frame=next_frame.image,
+            interaction=interaction,
+            strategic=strategic,
+            timings={
+                "capture": current_frame.elapsed_ms,
+                "policy": round(policy_ms, 2),
+                "tap": float(click_ms),
+                "verify_capture": next_frame.elapsed_ms,
+            },
+        )
+        current_frame, current_state = next_frame, next_state
+        if interaction == InteractionOutcome.NO_CHANGE:
+            attempted.add(chosen.key)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Local Beads Out CV agent")
     parser.add_argument("image", nargs="?", type=Path, help="analyze an existing screenshot")
     parser.add_argument("--live", action="store_true", help="capture the connected Android screen through ADB")
-    parser.add_argument("--execute", action="store_true", help="send one tap per verified loop iteration")
-    parser.add_argument("--loop", action="store_true", help="continue after each tap only when the previous board changed")
-    parser.add_argument("--max-moves", type=int, default=100)
-    parser.add_argument("--min-confidence", type=float, default=0.65)
+    parser.add_argument("--execute", action="store_true", help="continuously play, observing after every action")
+    parser.add_argument("--loop", action="store_true", help="deprecated compatibility flag; --execute is continuous")
+    parser.add_argument("--max-moves", type=int, default=None, help="optional cap on gameplay actions; default is unbounded")
     parser.add_argument("--settle-seconds", type=float, default=0.25)
     parser.add_argument("--adb", type=Path, help="path to adb.exe")
     parser.add_argument("--serial", help="ADB device serial when more than one device is connected")
-    parser.add_argument("--debug-dir", type=Path, help="save annotated frames and before/after images")
+    parser.add_argument("--debug-dir", type=Path, help="directory for run journals, frames, and evidence")
     return parser
 
 
