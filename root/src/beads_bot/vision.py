@@ -120,10 +120,16 @@ def _tile_color(hsv: np.ndarray, box: tuple[int, int, int, int]) -> tuple[str | 
     return None, 0.0, "unknown"
 
 
-def _rim_score(rgb: np.ndarray, box: tuple[int, int, int, int]) -> float:
+def _attached_halo_score(rgb: np.ndarray, box: tuple[int, int, int, int]) -> float:
+    """Measure bright neutral pixels in a narrow band attached to the tile edge.
+
+    Raised cubes have a continuous pale rim just outside their body. Sampling a
+    broad neighborhood also captures bright playfield pixels, so keep this band
+    close to the detected tile and require near-white, low-chroma pixels.
+    """
     left, top, right, bottom = box
     width, height = right - left, bottom - top
-    pad_x, pad_y = max(2, round(width * 0.12)), max(2, round(height * 0.12))
+    pad_x, pad_y = max(2, round(width * 0.04)), max(2, round(height * 0.04))
     outer_left, outer_top = max(0, left - pad_x), max(0, top - pad_y)
     outer_right, outer_bottom = min(rgb.shape[1], right + pad_x), min(rgb.shape[0], bottom + pad_y)
     crop = rgb[outer_top:outer_bottom, outer_left:outer_right].astype(np.int16)
@@ -137,16 +143,18 @@ def _rim_score(rgb: np.ndarray, box: tuple[int, int, int, int]) -> float:
     ring = ~inside
     if not np.any(ring):
         return 0.0
-    brightest = crop.min(axis=2) >= 190
-    neutral = crop.max(axis=2) - crop.min(axis=2) <= 55
+    brightest = crop.min(axis=2) >= 210
+    neutral = crop.max(axis=2) - crop.min(axis=2) <= 25
     return float(np.mean((brightest & neutral)[ring]))
 
 
-def _legality(rim_score: float) -> tuple[str, float]:
-    if rim_score >= 0.22:
-        return "RH", min(0.99, 0.68 + (rim_score - 0.22) * 0.8)
-    if rim_score <= 0.14:
-        return "DNH", min(0.96, 0.66 + (0.14 - rim_score) * 2.5)
+def _legality(attached_halo_score: float) -> tuple[str, float]:
+    # The local halo separates raised and depressed cubes across the reference
+    # boards; broad outer-ring brightness is not a reliable relief cue.
+    if attached_halo_score >= 0.20:
+        return "RH", min(0.99, 0.68 + (attached_halo_score - 0.20) * 0.8)
+    if attached_halo_score <= 0.08:
+        return "DNH", min(0.96, 0.66 + (0.08 - attached_halo_score) * 2.5)
     return "UNKNOWN", 0.48
 
 
@@ -179,7 +187,7 @@ def _find_tiles(rgb: np.ndarray, hsv: np.ndarray) -> tuple[tuple[Tile, ...], tup
     tiles: list[Tile] = []
     for index, (box, has_special_value) in enumerate(cells, start=1):
         color, color_confidence, kind = _tile_color(hsv, box)
-        relief_score = _rim_score(rgb, box)
+        relief_score = _attached_halo_score(rgb, box)
         legality, relief_confidence = _legality(relief_score)
         if kind == "hidden":
             legality = "DNH" if legality == "UNKNOWN" else legality

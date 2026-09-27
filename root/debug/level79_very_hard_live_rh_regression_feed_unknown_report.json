@@ -1,0 +1,567 @@
+{
+  "screen": "game",
+  "difficulty": "Very Hard",
+  "size": [
+    1080,
+    2400
+  ],
+  "feed": {
+    "current": null,
+    "upcoming": [],
+    "confidence": 0.0,
+    "source": "unresolved: conveyor outlet and center order"
+  },
+  "board_region": [
+    108,
+    1383,
+    961,
+    2034
+  ],
+  "locks": [
+    {
+      "id": "lock-01",
+      "bbox": [
+        350,
+        1716,
+        438,
+        1816
+      ],
+      "center": [
+        394,
+        1760
+      ],
+      "confidence": 0.814,
+      "overlapping_tile_ids": [
+        "tile-13",
+        "tile-14"
+      ]
+    },
+    {
+      "id": "lock-02",
+      "bbox": [
+        350,
+        1880,
+        438,
+        1980
+      ],
+      "center": [
+        394,
+        1924
+      ],
+      "confidence": 0.811,
+      "overlapping_tile_ids": [
+        "tile-19",
+        "tile-20"
+      ]
+    }
+  ],
+  "warnings": [],
+  "tiles": [
+    {
+      "id": "tile-01",
+      "bbox": [
+        108,
+        1383,
+        240,
+        1532
+      ],
+      "center": [
+        174,
+        1457
+      ],
+      "color": "pink",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.99,
+      "color_confidence": 0.611,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-02",
+      "bbox": [
+        255,
+        1383,
+        387,
+        1532
+      ],
+      "center": [
+        321,
+        1457
+      ],
+      "color": "white",
+      "kind": "special",
+      "legality": "RH",
+      "confidence": 0.99,
+      "color_confidence": 0.72,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": "UNKNOWN"
+    },
+    {
+      "id": "tile-03",
+      "bbox": [
+        401,
+        1383,
+        533,
+        1532
+      ],
+      "center": [
+        467,
+        1457
+      ],
+      "color": "blue",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.99,
+      "color_confidence": 0.889,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-04",
+      "bbox": [
+        548,
+        1383,
+        680,
+        1532
+      ],
+      "center": [
+        614,
+        1457
+      ],
+      "color": "purple",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.99,
+      "color_confidence": 0.889,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-05",
+      "bbox": [
+        695,
+        1383,
+        826,
+        1532
+      ],
+      "center": [
+        760,
+        1457
+      ],
+      "color": "red",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.99,
+      "color_confidence": 0.889,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-06",
+      "bbox": [
+        841,
+        1383,
+        961,
+        1532
+      ],
+      "center": [
+        901,
+        1457
+      ],
+      "color": "blue",
+      "kind": "tile",
+      "legality": "RH",
+      "confidence": 0.907,
+      "color_confidence": 0.861,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-07",
+      "bbox": [
+        108,
+        1572,
+        240,
+        1696
+      ],
+      "center": [
+        174,
+        1634
+      ],
+      "color": "orange",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.842,
+      "color_confidence": 0.944,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-08",
+      "bbox": [
+        255,
+        1572,
+        387,
+        1696
+      ],
+      "center": [
+        321,
+        1634
+      ],
+      "color": "pink",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.796,
+      "color_confidence": 0.806,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-09",
+      "bbox": [
+        548,
+        1572,
+        680,
+        1696
+      ],
+      "center": [
+        614,
+        1634
+      ],
+      "color": "blue",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.847,
+      "color_confidence": 0.806,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-10",
+      "bbox": [
+        695,
+        1572,
+        826,
+        1696
+      ],
+      "center": [
+        760,
+        1634
+      ],
+      "color": "teal",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.846,
+      "color_confidence": 0.722,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-11",
+      "bbox": [
+        841,
+        1572,
+        961,
+        1696
+      ],
+      "center": [
+        901,
+        1634
+      ],
+      "color": "purple",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.834,
+      "color_confidence": 0.694,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-12",
+      "bbox": [
+        108,
+        1735,
+        240,
+        1859
+      ],
+      "center": [
+        174,
+        1797
+      ],
+      "color": "purple",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.837,
+      "color_confidence": 0.694,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-13",
+      "bbox": [
+        255,
+        1735,
+        387,
+        1859
+      ],
+      "center": [
+        321,
+        1797
+      ],
+      "color": "cyan",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.803,
+      "color_confidence": 0.833,
+      "locked": false,
+      "lock_marker_ids": [
+        "lock-01"
+      ],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-14",
+      "bbox": [
+        402,
+        1735,
+        533,
+        1859
+      ],
+      "center": [
+        467,
+        1797
+      ],
+      "color": "cyan",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.805,
+      "color_confidence": 0.833,
+      "locked": false,
+      "lock_marker_ids": [
+        "lock-01"
+      ],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-15",
+      "bbox": [
+        548,
+        1735,
+        680,
+        1859
+      ],
+      "center": [
+        614,
+        1797
+      ],
+      "color": "gray",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.842,
+      "color_confidence": 0.72,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-16",
+      "bbox": [
+        695,
+        1735,
+        826,
+        1859
+      ],
+      "center": [
+        760,
+        1797
+      ],
+      "color": "yellow",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.846,
+      "color_confidence": 0.97,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-17",
+      "bbox": [
+        841,
+        1735,
+        961,
+        1859
+      ],
+      "center": [
+        901,
+        1797
+      ],
+      "color": "pink",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.838,
+      "color_confidence": 0.806,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-18",
+      "bbox": [
+        108,
+        1875,
+        229,
+        2034
+      ],
+      "center": [
+        168,
+        1954
+      ],
+      "color": "green",
+      "kind": "special",
+      "legality": "DNH",
+      "confidence": 0.828,
+      "color_confidence": 0.806,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": "UNKNOWN"
+    },
+    {
+      "id": "tile-19",
+      "bbox": [
+        255,
+        1899,
+        387,
+        2023
+      ],
+      "center": [
+        321,
+        1961
+      ],
+      "color": "indigo",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.84,
+      "color_confidence": 0.75,
+      "locked": false,
+      "lock_marker_ids": [
+        "lock-02"
+      ],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-20",
+      "bbox": [
+        402,
+        1899,
+        533,
+        2023
+      ],
+      "center": [
+        467,
+        1961
+      ],
+      "color": "teal",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.847,
+      "color_confidence": 0.722,
+      "locked": false,
+      "lock_marker_ids": [
+        "lock-02"
+      ],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-21",
+      "bbox": [
+        548,
+        1899,
+        680,
+        2023
+      ],
+      "center": [
+        614,
+        1961
+      ],
+      "color": "orange",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.839,
+      "color_confidence": 0.944,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    },
+    {
+      "id": "tile-22",
+      "bbox": [
+        695,
+        1899,
+        826,
+        2023
+      ],
+      "center": [
+        760,
+        1961
+      ],
+      "color": "green",
+      "kind": "tile",
+      "legality": "DNH",
+      "confidence": 0.844,
+      "color_confidence": 0.806,
+      "locked": false,
+      "lock_marker_ids": [],
+      "number": null,
+      "value_status": null
+    }
+  ],
+  "decision": {
+    "tile_id": null,
+    "center": null,
+    "reason": "current conveyor color is unknown; pause for a fresh observation",
+    "confidence": 0.0
+  },
+  "timings_ms": {
+    "capture": 0.0,
+    "vision": 495.75,
+    "policy": 0.01,
+    "click": 0.0,
+    "total": 956.13
+  },
+  "execution": "offline: no input sent"
+}

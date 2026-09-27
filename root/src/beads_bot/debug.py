@@ -37,7 +37,7 @@ def save_debug_image(
         left, top, right, bottom = tile.bbox
         border_width = 5 if tile.id == selected_id else 3
         short_id = tile.id.rsplit("-", 1)[-1]
-        text = f"{short_id} VALUE UNKNOWN" if tile.kind == "special" and tile.number is None else (
+        text = f"{short_id} {tile.legality} value unknown" if tile.kind == "special" and tile.number is None else (
             f"{short_id} {tile.color or tile.kind} {tile.legality}"
         )
         label_top = max(0, top - 15)

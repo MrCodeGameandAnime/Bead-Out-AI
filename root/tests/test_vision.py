@@ -6,6 +6,7 @@ from beads_bot.vision import analyze_frame
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "img"
+LEVEL60_FRAME = ROOT / "src" / "root" / "debug" / "before_001.png"
 
 
 class VisionSampleTests(unittest.TestCase):
@@ -71,7 +72,7 @@ class VisionSampleTests(unittest.TestCase):
         self.assertTrue(all(tile.number is None for tile in special))
 
     def test_live_level60_recovers_every_cell_even_when_locks_join_masks(self):
-        state = analyze_frame(ROOT / "debug" / "before_001.png")
+        state = analyze_frame(LEVEL60_FRAME)
 
         expected_centers = [
             (342, 1347), (474, 1347), (606, 1347), (738, 1347),
@@ -86,7 +87,7 @@ class VisionSampleTests(unittest.TestCase):
             self._tile_near(state, center)
 
     def test_live_level60_top_row_blue_and_pink_remain_raised(self):
-        state = analyze_frame(ROOT / "debug" / "before_001.png")
+        state = analyze_frame(LEVEL60_FRAME)
 
         blue = self._tile_near(state, (342, 1347))
         pink = self._tile_near(state, (474, 1347))
@@ -96,13 +97,13 @@ class VisionSampleTests(unittest.TestCase):
         self.assertEqual((cyan.color, cyan.legality), ("cyan", "RH"))
 
     def test_live_level60_bright_yellow_cubes_are_depressed(self):
-        state = analyze_frame(ROOT / "debug" / "before_001.png")
+        state = analyze_frame(LEVEL60_FRAME)
 
         for center in ((342, 1653), (474, 1653), (606, 1653)):
             self.assertEqual(self._tile_near(state, center).legality, "DNH")
 
     def test_live_level60_special_values_are_correct_or_left_unknown(self):
-        state = analyze_frame(ROOT / "debug" / "before_001.png")
+        state = analyze_frame(LEVEL60_FRAME)
         expected = {
             (342, 1800): 600,
             (474, 1800): 3,
@@ -117,16 +118,35 @@ class VisionSampleTests(unittest.TestCase):
             self.assertIn(tile.number, (value, None))
 
     def test_live_level60_reports_lock_markers_separately_from_tiles(self):
-        state = analyze_frame(ROOT / "debug" / "before_001.png")
+        state = analyze_frame(LEVEL60_FRAME)
 
         self.assertEqual(len(state.locks), 2)
         self.assertEqual(len(state.tiles), 19)
 
     def test_live_level60_feed_stays_unknown_without_verified_outlet_read(self):
-        state = analyze_frame(ROOT / "debug" / "before_001.png")
+        state = analyze_frame(LEVEL60_FRAME)
 
         self.assertIsNone(state.feed.current)
         self.assertNotIn("top edge", state.feed.source)
+
+    def test_level79_live_frame_matches_manual_rh_dnh_ground_truth(self):
+        state = analyze_frame(SAMPLES / "level79_very_hard_live_rh_regression_feed_unknown.png")
+
+        expected_raised = {
+            (174, 1457), (321, 1457), (467, 1457),
+            (614, 1457), (760, 1457), (901, 1457),
+        }
+        expected_depressed = {
+            (174, 1634), (321, 1634), (614, 1634), (760, 1634), (901, 1634),
+            (174, 1797), (321, 1797), (467, 1797), (614, 1797), (760, 1797), (901, 1797),
+            (168, 1954), (321, 1961), (467, 1961), (614, 1961), (760, 1961),
+        }
+
+        self.assertEqual(len(state.tiles), 22)
+        actual_raised = {tile.center for tile in state.tiles if tile.legality == "RH"}
+        actual_depressed = {tile.center for tile in state.tiles if tile.legality == "DNH"}
+        self.assertEqual(actual_raised, expected_raised)
+        self.assertEqual(actual_depressed, expected_depressed)
 
     def test_home_screen_is_not_reported_as_a_game_board(self):
         state = analyze_frame(SAMPLES / "level51_home_screen.png")
