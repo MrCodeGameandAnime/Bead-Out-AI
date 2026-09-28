@@ -11,6 +11,7 @@ from beads_bot.board import (
     FeedObservation,
     GameState,
     InteractionOutcome,
+    LockMarker,
     StrategicOutcome,
     Tile,
 )
@@ -21,7 +22,7 @@ from beads_bot.recording import RunRecorder, classify_transition
 _DEFAULT_CHOSEN = object()
 
 
-def _state(tiles, *, screen="game", progress=None):
+def _state(tiles, *, screen="game", progress=None, feed=None, locks=()):
     tile_list = tuple(tiles)
     board = None if not tile_list else (
         min(tile.bbox[0] for tile in tile_list),
@@ -35,7 +36,8 @@ def _state(tiles, *, screen="game", progress=None):
         height=400,
         tiles=tile_list,
         board_region=board,
-        feed=FeedObservation(None, (), 0.0, "unresolved"),
+        feed=feed or FeedObservation(None, (), 0.0, "unresolved"),
+        locks=tuple(locks),
         progress=progress,
     )
 
@@ -80,6 +82,8 @@ class RecordingTests(unittest.TestCase):
         event = json.loads(self.recorder.events_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(event["step_id"], step_id)
+        self.assertEqual(event["schema_version"], 2)
+        self.assertEqual(event["acceptance_model_version"], "tile-local-v1")
         self.assertEqual(event["before_state"]["tiles"][0]["id"], "tile-1")
         self.assertEqual(event["after_state"]["tiles"], [])
         self.assertEqual(event["candidates"][0]["tile"]["id"], "tile-1")
@@ -132,6 +136,85 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(strategic, StrategicOutcome.IN_PROGRESS)
         self.assertEqual(tally.action_accepted, 1)
         self.assertEqual(tally.local_progress, 0)
+
+    def test_unrelated_tile_change_is_not_attributed_to_chosen_tile(self):
+        unrelated = _tile("unrelated", y=130)
+        before = _state([_tile(), unrelated])
+        candidate = rank_candidates(before)[0]
+        after = _state([
+            replace(candidate.tile, id="regenerated-tile-id"),
+            replace(unrelated, color="blue", legality="DNH"),
+        ])
+
+        interaction, _ = classify_transition(before, after, candidate)
+
+        self.assertEqual(interaction, InteractionOutcome.NO_CHANGE)
+
+    def test_adjacent_tile_change_is_local_acceptance_evidence(self):
+        neighbor = Tile("neighbor", (95, 30, 155, 90), "blue", "RH", 0.9, 0.9)
+        before = _state([_tile(), neighbor])
+        candidate = rank_candidates(before)[0]
+        after = _state([replace(candidate.tile, id="new-id")])
+
+        interaction, _ = classify_transition(before, after, candidate)
+
+        self.assertEqual(interaction, InteractionOutcome.ACTION_ACCEPTED)
+
+    def test_feed_change_is_not_attributed_to_chosen_tile(self):
+        after = replace(
+            self.before,
+            feed=FeedObservation("blue", ("red", None), 0.9, "visible outlet"),
+        )
+
+        interaction, _ = classify_transition(self.before, after, self.candidate)
+
+        self.assertEqual(interaction, InteractionOutcome.NO_CHANGE)
+
+    def test_small_chosen_tile_bbox_jitter_is_not_attributed_as_a_response(self):
+        jittered = replace(self.candidate.tile, id="fresh-id", bbox=(31, 29, 91, 89))
+        after = _state([jittered])
+
+        interaction, _ = classify_transition(self.before, after, self.candidate)
+
+        self.assertEqual(interaction, InteractionOutcome.NO_CHANGE)
+
+    def test_chosen_tile_legality_change_is_direct_acceptance_evidence(self):
+        after = _state([replace(self.candidate.tile, legality="DNH")])
+
+        interaction, _ = classify_transition(self.before, after, self.candidate)
+
+        self.assertEqual(interaction, InteractionOutcome.ACTION_ACCEPTED)
+
+    def test_chosen_tile_kind_or_overlay_change_is_direct_acceptance_evidence(self):
+        for change in (replace(self.candidate.tile, kind="special"),
+                       replace(self.candidate.tile, locked=True)):
+            with self.subTest(change=change):
+                interaction, _ = classify_transition(
+                    self.before,
+                    _state([change]),
+                    self.candidate,
+                )
+
+                self.assertEqual(interaction, InteractionOutcome.ACTION_ACCEPTED)
+
+    def test_chosen_tile_gaining_or_losing_an_external_lock_overlay_is_accepted(self):
+        overlay = LockMarker("tile-overlay", (38, 32, 82, 74), (60, 53), 0.9)
+        without_overlay = _state([self.candidate.tile])
+        with_overlay = _state([self.candidate.tile], locks=(overlay,))
+
+        gained, _ = classify_transition(without_overlay, with_overlay, self.candidate)
+        lost, _ = classify_transition(with_overlay, without_overlay, self.candidate)
+
+        self.assertEqual(gained, InteractionOutcome.ACTION_ACCEPTED)
+        self.assertEqual(lost, InteractionOutcome.ACTION_ACCEPTED)
+
+    def test_unrelated_lock_marker_change_is_not_attributed_to_chosen_tile(self):
+        lock = LockMarker("new-lock", (150, 140, 180, 170), (165, 155), 0.9)
+        after = _state([self.candidate.tile], locks=(lock,))
+
+        interaction, _ = classify_transition(self.before, after, self.candidate)
+
+        self.assertEqual(interaction, InteractionOutcome.NO_CHANGE)
 
     def test_unrecognized_after_state_does_not_prove_tap_was_accepted(self):
         after = _state([], screen="unknown")
@@ -189,7 +272,8 @@ class RecordingTests(unittest.TestCase):
         stored = json.loads(self.recorder.evidence_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(tally.action_accepted, 1)
-        self.assertEqual(stored["schema_version"], 1)
+        self.assertEqual(stored["schema_version"], 2)
+        self.assertEqual(stored["acceptance_model_version"], "tile-local-v1")
         self.assertEqual(stored["mechanic_id"], "magnet-lock")
         self.assertEqual(stored["features"]["unmodeled_future_feature"]["capture_revision"], 3)
         self.assertEqual(stored["features"]["neighbors"][0]["color"], "blue")
@@ -202,6 +286,22 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(tally.no_change, 1)
         self.assertEqual(tally.action_accepted, 0)
         self.assertEqual(tally.level_failure, 0)
+
+    def test_legacy_global_acceptance_is_not_used_as_tile_local_evidence(self):
+        record = {
+            "schema_version": 1,
+            "record_type": "action",
+            "mechanic_id": self.candidate.context.mechanic_id,
+            "features": dict(self.candidate.context.features),
+            "interaction_outcome": "ACTION_ACCEPTED",
+            "strategic_outcome": None,
+        }
+        self.recorder.evidence_path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+        tally = self.recorder.evidence_for(self.candidate.context)
+
+        self.assertEqual(tally.action_accepted, 0)
+        self.assertEqual(tally.no_change, 0)
 
 
 if __name__ == "__main__":

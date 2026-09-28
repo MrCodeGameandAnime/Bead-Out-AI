@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Callable, Iterable, Literal
 
 from .board import EvidenceContext, EvidenceTally, GameState, Tile
+from .matching import materially_changed_geometry, same_physical_tile, tile_semantics
 
 
 EvidenceStatus = Literal["KNOWN", "LIKELY", "UNCERTAIN", "UNKNOWN"]
@@ -16,6 +17,7 @@ _REQUIREMENT_WEIGHTS = {
     "lock_rule": 0.10,
     "other_mechanics": 0.04,
 }
+_POSITION_KEY_BUCKETS = 25
 
 
 @dataclass(frozen=True)
@@ -263,8 +265,12 @@ def _candidate(state: GameState, tile: Tile, evidence_for: Callable[[EvidenceCon
         for item in requirements
         if item.status in ("UNCERTAIN", "UNKNOWN")
     )
+    position_key = (
+        round(tile.center[0] / state.width * _POSITION_KEY_BUCKETS),
+        round(tile.center[1] / state.height * _POSITION_KEY_BUCKETS),
+    )
     return ActionCandidate(
-        key=f"{tile.id}@{tile.center[0]},{tile.center[1]}",
+        key=f"tile@{position_key[0]:02d},{position_key[1]:02d}",
         context=context,
         tile=tile,
         score=round(score, 4),
@@ -274,10 +280,24 @@ def _candidate(state: GameState, tile: Tile, evidence_for: Callable[[EvidenceCon
     )
 
 
+def _matches_attempt(
+    candidate: ActionCandidate,
+    prior: ActionCandidate | str,
+    size: tuple[int, int],
+) -> bool:
+    if isinstance(prior, str):
+        return candidate.key == prior
+    return (
+        same_physical_tile(prior.tile, candidate.tile, size, size)
+        and not materially_changed_geometry(prior.tile, candidate.tile, size, size)
+        and tile_semantics(prior.tile) == tile_semantics(candidate.tile)
+    )
+
+
 def rank_candidates(
     state: GameState,
     *,
-    attempted: frozenset[str] = frozenset(),
+    attempted: Iterable[ActionCandidate | str] = (),
     evidence_for: Callable[[EvidenceContext], EvidenceTally] | None = None,
 ) -> tuple[ActionCandidate, ...]:
     """Return plausible tile actions, ordered by local evidence and context."""
@@ -288,7 +308,11 @@ def rank_candidates(
         for tile in state.tiles
         if tile.legality != "DNH"
     ]
-    candidates = [candidate for candidate in candidates if candidate.key not in attempted]
+    attempted_items = tuple(attempted)
+    candidates = [
+        candidate for candidate in candidates
+        if not any(_matches_attempt(candidate, prior, (state.width, state.height)) for prior in attempted_items)
+    ]
     candidates.sort(key=lambda candidate: (
         candidate.score,
         candidate.confidence,
@@ -298,10 +322,24 @@ def rank_candidates(
     return tuple(candidates)
 
 
+def prune_attempted(state: GameState, attempted: list[ActionCandidate]) -> None:
+    """Forget no-change taps once their physical tile disappears or changes state."""
+    size = (state.width, state.height)
+    attempted[:] = [
+        prior for prior in attempted
+        if any(
+            same_physical_tile(prior.tile, tile, size, size)
+            and not materially_changed_geometry(prior.tile, tile, size, size)
+            and tile_semantics(prior.tile) == tile_semantics(tile)
+            for tile in state.tiles
+        )
+    ]
+
+
 def choose_move(
     state: GameState,
     *,
-    attempted: frozenset[str] = frozenset(),
+    attempted: Iterable[ActionCandidate | str] = (),
     evidence_for: Callable[[EvidenceContext], EvidenceTally] | None = None,
 ) -> Decision:
     candidates = rank_candidates(state, attempted=attempted, evidence_for=evidence_for)

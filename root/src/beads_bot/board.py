@@ -11,6 +11,10 @@ class FeedObservation:
     source: str
     direction: str | None = None
     direction_confidence: float = 0.0
+    current_status: str = "unknown"
+    upcoming_status: str = "unknown"
+    outlet_status: str = "unknown"
+    age_frames: int = 0
 
 
 class InteractionOutcome(str, Enum):

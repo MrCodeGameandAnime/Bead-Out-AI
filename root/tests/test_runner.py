@@ -277,6 +277,46 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual([event["chosen"]["tile"]["id"] for event in actions], ["first", "second"])
         self.assertEqual([event["outcomes"]["interaction"] for event in actions], ["NO_CHANGE", "NO_CHANGE"])
 
+    def test_bbox_jitter_feed_change_and_unrelated_tile_change_do_not_retry_same_candidate(self):
+        chosen = _tile("chosen", 20)
+        other = _tile("other", 120, color="blue")
+        before = _state([chosen, other])
+        moved = Tile(
+            id="regenerated-id",
+            bbox=(23, 23, 83, 83),
+            color=chosen.color,
+            legality=chosen.legality,
+            confidence=chosen.confidence,
+            color_confidence=chosen.color_confidence,
+        )
+        after = GameState(
+            screen="game",
+            width=240,
+            height=500,
+            tiles=(moved, Tile(
+                id="other-new-id",
+                bbox=other.bbox,
+                color="red",
+                legality="DNH",
+                confidence=other.confidence,
+                color_confidence=other.color_confidence,
+            )),
+            board_region=(20, 23, 83, 180),
+            feed=FeedObservation("red", (), 0.9, "visible outlet"),
+        )
+
+        result, taps, _ = self._run([before, after], max_moves=None)
+
+        self.assertEqual(len(taps), 1)
+        self.assertEqual(result["status"], "no_progress")
+        events = [
+            json.loads(line)
+            for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()
+        ]
+        actions = [event for event in events if event["chosen"] is not None]
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0]["outcomes"]["interaction"], "NO_CHANGE")
+
     def test_progress_resets_attempts_for_a_changed_state(self):
         before = _state([_tile("same", 20, color="green")])
         changed = _state([_tile("same", 20, color="blue")])

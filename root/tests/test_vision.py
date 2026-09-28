@@ -1,13 +1,18 @@
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 from PIL import Image
 
+from beads_bot.board import FeedObservation, GameState
 from beads_bot.vision import FeedTracker, analyze_frame
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "img"
 LEVEL60_FRAME = SAMPLES / "before_001.png"
+LEVEL80_WORKING_FEED = SAMPLES / "level80_feed_dropout_reference_working.jpg"
+LEVEL80_OUTLET_DROPOUT = SAMPLES / "level80_feed_dropout_reference_occluded.jpg"
+LEVEL80_OVERSIZED_OUTLET = SAMPLES / "level80_feed_oversized_false_outlet_reference.jpg"
 
 
 class VisionSampleTests(unittest.TestCase):
@@ -226,6 +231,95 @@ class VisionSampleTests(unittest.TestCase):
         self.assertEqual(second_state.feed.current, "indigo")
         self.assertEqual(second_state.feed.direction, "from_left_toward_outlet")
         self.assertGreater(second_state.feed.direction_confidence, 0.65)
+
+    def test_level80_evolving_frame_reads_visible_bead_at_tracked_outlet_geometry(self):
+        tracker = FeedTracker()
+        working_image = Image.open(LEVEL80_WORKING_FEED)
+        dropout_image = Image.open(LEVEL80_OUTLET_DROPOUT)
+        working_state = tracker.observe(working_image, analyze_frame(working_image))
+        raw_dropout_state = analyze_frame(dropout_image)
+        dropout_state = tracker.observe(dropout_image, raw_dropout_state)
+
+        self.assertEqual(working_state.feed.current, "indigo")
+        self.assertEqual(working_state.feed.upcoming[:3], ("red", "orange", "blue"))
+        self.assertIsNone(raw_dropout_state.feed.current)
+        self.assertEqual(dropout_state.feed.current, "orange")
+        self.assertEqual(dropout_state.feed.current_status, "direct")
+        self.assertEqual(dropout_state.feed.outlet_status, "tracked")
+        self.assertEqual(dropout_state.feed.direction, "from_left_toward_outlet")
+        self.assertEqual(dropout_state.feed.upcoming[:2], ("blue", "indigo"))
+
+    def test_level80_oversized_track_component_is_not_mistaken_for_the_outlet(self):
+        state = analyze_frame(LEVEL80_OVERSIZED_OUTLET)
+
+        self.assertIsNone(state.feed.current)
+        self.assertEqual(state.feed.outlet_status, "unknown")
+        self.assertIn("outlet geometry not found", state.feed.source)
+
+    def test_single_feed_dropout_retains_recent_belief_with_one_step_decay(self):
+        image = Image.new("RGB", (400, 800), "beige")
+        state = GameState("game", 400, 800, (), None, FeedObservation(None, (), 0.0, "unknown"))
+        direct = FeedObservation(
+            "blue", ("white", "pink", None), 0.9, "visible outlet",
+            current_status="direct", upcoming_status="direct", outlet_status="direct",
+        )
+        unresolved = FeedObservation(None, (), 0.0, "unresolved: outlet geometry not found")
+        tracker = FeedTracker()
+        with patch("beads_bot.vision._read_feed", side_effect=(direct, unresolved)):
+            tracker.observe(image, state)
+            observed = tracker.observe(image, state).feed
+
+        self.assertEqual(observed.current, "blue")
+        self.assertEqual(observed.upcoming, ("white", "pink", None))
+        self.assertEqual((observed.current_status, observed.upcoming_status, observed.age_frames),
+                         ("tracked", "tracked", 1))
+        self.assertAlmostEqual(observed.confidence, 0.45)
+
+    def test_repeated_feed_dropout_decays_then_expires(self):
+        image = Image.new("RGB", (400, 800), "beige")
+        state = GameState("game", 400, 800, (), None, FeedObservation(None, (), 0.0, "unknown"))
+        direct = FeedObservation("blue", ("white", None), 0.8, "visible outlet", current_status="direct")
+        unresolved = FeedObservation(None, (), 0.0, "unresolved: outlet geometry not found")
+        tracker = FeedTracker()
+        with patch("beads_bot.vision._read_feed", side_effect=(direct, unresolved, unresolved, unresolved)):
+            tracker.observe(image, state)
+            first = tracker.observe(image, state).feed
+            second = tracker.observe(image, state).feed
+            expired = tracker.observe(image, state).feed
+
+        self.assertEqual((first.current, first.age_frames, first.confidence), ("blue", 1, 0.4))
+        self.assertEqual((second.current, second.age_frames, second.confidence), ("blue", 2, 0.2))
+        self.assertIsNone(expired.current)
+        self.assertEqual(expired.current_status, "unknown")
+        self.assertEqual(expired.age_frames, 3)
+
+    def test_contradictory_direct_feed_replaces_tracked_belief_immediately(self):
+        image = Image.new("RGB", (400, 800), "beige")
+        state = GameState("game", 400, 800, (), None, FeedObservation(None, (), 0.0, "unknown"))
+        blue = FeedObservation("blue", ("white", "pink", None), 0.9, "direct blue", current_status="direct")
+        unresolved = FeedObservation(None, (), 0.0, "unresolved")
+        pink = FeedObservation("pink", ("orange", None), 0.8, "direct pink", current_status="direct")
+        tracker = FeedTracker()
+        with patch("beads_bot.vision._read_feed", side_effect=(blue, unresolved, pink)):
+            tracker.observe(image, state)
+            tracked = tracker.observe(image, state).feed
+            direct = tracker.observe(image, state).feed
+
+        self.assertEqual(tracked.current_status, "tracked")
+        self.assertEqual((direct.current, direct.current_status, direct.age_frames), ("pink", "direct", 0))
+        self.assertEqual(direct.upcoming, ("orange", None))
+
+    def test_concealed_feed_invalidates_a_previously_tracked_color(self):
+        tracker = FeedTracker()
+        visible_image = Image.open(LEVEL80_WORKING_FEED)
+        tracker.observe(visible_image, analyze_frame(visible_image))
+        hidden_image = Image.open(SAMPLES / "level57_hidden_beads_special_tiles.png")
+        hidden_state = tracker.observe(hidden_image, analyze_frame(hidden_image))
+
+        self.assertIsNone(hidden_state.feed.current)
+        self.assertEqual(hidden_state.feed.upcoming, (None,))
+        self.assertEqual(hidden_state.feed.upcoming_status, "concealed")
+        self.assertEqual(hidden_state.feed.current_status, "unknown")
 
     def test_annotated_level_failed_screen_exposes_only_its_marked_close_target(self):
         state = analyze_frame(SAMPLES / "failure_03.jpg")

@@ -11,7 +11,7 @@ from .board import GameState, InteractionOutcome, ScreenControl, StrategicOutcom
 from .capture import CapturedFrame, capture_frame
 from .debug import save_debug_image
 from .input import tap
-from .policy import ActionCandidate, Decision, choose_move, rank_candidates
+from .policy import ActionCandidate, Decision, choose_move, prune_attempted, rank_candidates
 from .recording import RunRecorder, classify_transition
 from .vision import FeedTracker, analyze_frame
 
@@ -284,8 +284,7 @@ def run_live(
     except Exception as error:
         return finish_attempt("device_error", f"initial capture failed: {error}")
 
-    attempted: set[str] = set()
-    active_signature: tuple | None = None
+    attempted: list[ActionCandidate] = []
     unknown_reobservations = 0
     while True:
         state = current_state
@@ -313,12 +312,6 @@ def run_live(
             action_count = 0
             input_count = 0
             attempted.clear()
-            active_signature = None
-
-        signature = _state_signature(state)
-        if signature != active_signature:
-            attempted.clear()
-            active_signature = signature
 
         if state.screen == "failure":
             _record_observation(
@@ -347,7 +340,6 @@ def run_live(
             action_count = 0
             input_count = 0
             attempted.clear()
-            active_signature = None
             current_frame, current_state = next_frame, next_state
             continue
 
@@ -401,7 +393,6 @@ def run_live(
                 return finish_attempt("no_progress", f"{state.screen} navigation target produced no state change")
             if state.screen == "home" and next_state.screen == "game":
                 attempted.clear()
-                active_signature = None
             current_frame, current_state = next_frame, next_state
             continue
 
@@ -493,7 +484,6 @@ def run_live(
             if next_state.screen == "game":
                 current_frame, current_state = next_frame, next_state
                 attempted.clear()
-                active_signature = None
                 continue
             if next_state.screen == "failure":
                 current_frame, current_state = next_frame, next_state
@@ -545,9 +535,10 @@ def run_live(
             continue
 
         policy_started = time.perf_counter()
+        prune_attempted(state, attempted)
         candidates = rank_candidates(
             state,
-            attempted=frozenset(attempted),
+            attempted=tuple(attempted),
             evidence_for=recorder.evidence_for,
         )
         policy_ms = (time.perf_counter() - policy_started) * 1000
@@ -614,7 +605,7 @@ def run_live(
         )
         current_frame, current_state = next_frame, next_state
         if interaction == InteractionOutcome.NO_CHANGE:
-            attempted.add(chosen.key)
+            attempted.append(chosen)
 
 
 def build_parser() -> argparse.ArgumentParser:

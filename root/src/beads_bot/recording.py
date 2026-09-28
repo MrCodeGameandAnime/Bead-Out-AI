@@ -18,6 +18,18 @@ from .board import (
     StrategicOutcome,
 )
 from .policy import ActionCandidate
+from .matching import (
+    local_neighborhood_changed,
+    lock_overlay_present,
+    materially_changed_geometry,
+    same_physical_tile,
+    tile_semantics,
+)
+
+
+RUN_SCHEMA_VERSION = 2
+EVIDENCE_SCHEMA_VERSION = 2
+ACCEPTANCE_MODEL_VERSION = "tile-local-v1"
 
 
 def _value(value):
@@ -63,19 +75,6 @@ def _outcome(value) -> str:
     return value.value if isinstance(value, Enum) else str(value)
 
 
-def _signature(state: GameState) -> tuple:
-    return (
-        state.screen,
-        state.modal_substate,
-        state.feed.current,
-        tuple(
-            (tile.bbox, tile.color, tile.legality, tile.kind, tile.locked, tile.number)
-            for tile in state.tiles
-        ),
-        tuple((lock.bbox, lock.center) for lock in state.locks),
-    )
-
-
 def classify_transition(
     before_state: GameState,
     after_state: GameState | None,
@@ -89,10 +88,40 @@ def classify_transition(
         interaction = InteractionOutcome.UNKNOWN
     elif chosen is None:
         interaction = InteractionOutcome.NOT_ATTEMPTED
-    elif _signature(before_state) != _signature(after_state):
-        interaction = InteractionOutcome.ACTION_ACCEPTED
     else:
-        interaction = InteractionOutcome.NO_CHANGE
+        before_size = (before_state.width, before_state.height)
+        after_size = (after_state.width, after_state.height)
+        matches = [
+            tile for tile in after_state.tiles
+            if same_physical_tile(chosen.tile, tile, before_size, after_size)
+        ]
+        if not matches:
+            interaction = InteractionOutcome.ACTION_ACCEPTED
+        else:
+            matched = min(
+                matches,
+                key=lambda tile: (
+                    materially_changed_geometry(chosen.tile, tile, before_size, after_size),
+                    abs(chosen.tile.center[0] / before_state.width - tile.center[0] / after_state.width)
+                    + abs(chosen.tile.center[1] / before_state.height - tile.center[1] / after_state.height),
+                ),
+            )
+            if (
+                tile_semantics(chosen.tile) != tile_semantics(matched)
+                or lock_overlay_present(chosen.tile, before_state.locks)
+                != lock_overlay_present(matched, after_state.locks)
+                or materially_changed_geometry(chosen.tile, matched, before_size, after_size)
+                or local_neighborhood_changed(
+                    chosen.tile,
+                    before_state.tiles,
+                    after_state.tiles,
+                    before_size,
+                    after_size,
+                )
+            ):
+                interaction = InteractionOutcome.ACTION_ACCEPTED
+            else:
+                interaction = InteractionOutcome.NO_CHANGE
 
     if after_state.screen == "complete":
         strategic = StrategicOutcome.LEVEL_SUCCESS
@@ -191,7 +220,8 @@ class RunRecorder:
         before_path = self._save_frame(before_frame, step_id, "before")
         after_path = self._save_frame(after_frame, step_id, "after")
         event = {
-            "schema_version": 1,
+            "schema_version": RUN_SCHEMA_VERSION,
+            "acceptance_model_version": ACCEPTANCE_MODEL_VERSION,
             "run_id": self.run_id,
             "step_id": step_id,
             "before_state": _state_data(before_state),
@@ -220,7 +250,8 @@ class RunRecorder:
             strategic = _outcome(strategic_outcome)
             if interaction in (InteractionOutcome.ACTION_ACCEPTED.value, InteractionOutcome.NO_CHANGE.value) or strategic == StrategicOutcome.LOCAL_PROGRESS.value:
                 self._append_jsonl(self.evidence_path, {
-                    "schema_version": 1,
+                    "schema_version": EVIDENCE_SCHEMA_VERSION,
+                    "acceptance_model_version": ACCEPTANCE_MODEL_VERSION,
                     "record_type": "action",
                     **_context_data(chosen.context),
                     "interaction_outcome": interaction,
@@ -250,10 +281,11 @@ class RunRecorder:
                     continue
                 interaction = record.get("interaction_outcome")
                 strategic = record.get("strategic_outcome")
-                if interaction == InteractionOutcome.ACTION_ACCEPTED.value:
-                    counts["action_accepted"] += 1
-                elif interaction == InteractionOutcome.NO_CHANGE.value:
-                    counts["no_change"] += 1
+                if record.get("acceptance_model_version") == ACCEPTANCE_MODEL_VERSION:
+                    if interaction == InteractionOutcome.ACTION_ACCEPTED.value:
+                        counts["action_accepted"] += 1
+                    elif interaction == InteractionOutcome.NO_CHANGE.value:
+                        counts["no_change"] += 1
                 if strategic == StrategicOutcome.LOCAL_PROGRESS.value:
                     counts["local_progress"] += 1
         return EvidenceTally(**counts)
@@ -279,7 +311,8 @@ class RunRecorder:
                 if event["chosen"] is not None
             ]
             self._append_jsonl(self.evidence_path, {
-                "schema_version": 1,
+                "schema_version": EVIDENCE_SCHEMA_VERSION,
+                "acceptance_model_version": ACCEPTANCE_MODEL_VERSION,
                 "record_type": "episode",
                 "mechanic_id": "action-sequence",
                 "features": {"action_count": len(sequence)},
@@ -291,7 +324,8 @@ class RunRecorder:
 
         recent = self._events[-max(0, recent_steps):] if recent_steps else []
         manifest = {
-            "schema_version": 1,
+            "schema_version": RUN_SCHEMA_VERSION,
+            "acceptance_model_version": ACCEPTANCE_MODEL_VERSION,
             "run_id": self.run_id,
             "status": status,
             "reason": reason,

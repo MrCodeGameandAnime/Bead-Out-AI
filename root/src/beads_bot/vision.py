@@ -605,13 +605,13 @@ def _find_feed_outlet(hsv: np.ndarray) -> tuple[float, float, float] | None:
         box_width, box_height = right - left, bottom - top
         center_x = x0 + (left + right) / 2
         center_y = y0 + (top + bottom) / 2
-        if not (0.055 * width <= box_width <= 0.18 * width):
+        if not (0.055 * width <= box_width <= 0.16 * width):
             continue
         if not (0.018 * height <= box_height <= 0.06 * height):
             continue
         if not (1.0 <= box_width / max(1, box_height) <= 3.2):
             continue
-        if not (0.40 * width <= center_x <= 0.60 * width):
+        if not (0.475 * width <= center_x <= 0.525 * width):
             continue
         if not (0.34 * height <= center_y <= 0.44 * height):
             continue
@@ -619,8 +619,11 @@ def _find_feed_outlet(hsv: np.ndarray) -> tuple[float, float, float] | None:
         candidates.append((fill, -abs(center_x - width / 2), center_x, y0 + top, box_width))
     if not candidates:
         return None
-    _, _, center_x, top, gate_width = max(candidates)
-    return center_x, float(top), float(gate_width)
+    _, _, _, top, gate_width = max(candidates)
+    # The exit is centered on the central loop. Component centroids drift when
+    # the purple track joins the gate mask, so use the stable screen center for
+    # its horizontal anchor after validating the component's own geometry.
+    return width / 2, float(top), float(gate_width)
 
 
 def _feed_patch_color(
@@ -672,9 +675,19 @@ def _has_concealed_feed(hsv: np.ndarray) -> bool:
     return float(dark_beads.mean()) >= 0.25 and float(bright_question_marks.mean()) >= 0.02
 
 
-def _read_feed(hsv: np.ndarray) -> FeedObservation:
+_FEED_OUTLET_UNSET = object()
+
+
+def _read_feed(
+    hsv: np.ndarray,
+    outlet: tuple[float, float, float] | None | object = _FEED_OUTLET_UNSET,
+    *,
+    outlet_status: str = "direct",
+) -> FeedObservation:
     """Read the bead at the visible outlet and a short, visible left approach."""
-    outlet = _find_feed_outlet(hsv)
+    if outlet is _FEED_OUTLET_UNSET:
+        outlet = _find_feed_outlet(hsv)
+        outlet_status = "direct" if outlet is not None else "unknown"
     if outlet is None:
         if _has_concealed_feed(hsv):
             return FeedObservation(
@@ -682,15 +695,23 @@ def _read_feed(hsv: np.ndarray) -> FeedObservation:
                 (None,),
                 0.0,
                 "concealed conveyor region; current and upcoming colors unknown",
+                upcoming_status="concealed",
+                outlet_status="unknown",
             )
-        return FeedObservation(None, (), 0.0, "unresolved: outlet geometry not found")
+        return FeedObservation(
+            None, (), 0.0, "unresolved: outlet geometry not found",
+            outlet_status="unknown",
+        )
 
     outlet_x, gate_top, gate_width = outlet
     bead_y = gate_top - gate_width * 0.105
     bead_radius = max(4, round(gate_width * 0.045))
     current, confidence = _feed_patch_color(hsv, (outlet_x, bead_y), bead_radius)
     if current is None:
-        return FeedObservation(None, (), 0.0, "outlet found; bead color unresolved")
+        return FeedObservation(
+            None, (), 0.0, "outlet found; bead color unresolved",
+            outlet_status=str(outlet_status),
+        )
 
     # The board's visible approach curves up and left from the exit gate.
     # Temporal observations below verify that this is the advancing direction.
@@ -747,23 +768,69 @@ def _read_feed(hsv: np.ndarray) -> FeedObservation:
         current,
         tuple(upcoming),
         confidence,
-        "visible outlet bead; left-approach lookahead pending temporal confirmation",
+        (
+            "visible outlet bead; left-approach lookahead pending temporal confirmation"
+            if outlet_status == "direct"
+            else "visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation"
+        ),
+        current_status="direct",
+        upcoming_status="direct",
+        outlet_status=str(outlet_status),
     )
 
 
 class FeedTracker:
-    """Use successive outlet observations to verify the approach direction."""
+    """Track stable outlet geometry and briefly retain unresolved feed evidence."""
+
+    MAX_CARRIED_FRAMES = 2
+    CONFIDENCE_DECAY_PER_FRAME = 0.5
 
     def __init__(self) -> None:
-        self._previous: FeedObservation | None = None
+        self._last_direct: FeedObservation | None = None
+        self._dropout_age = 0
+        self._outlet_geometry: tuple[float, float, float] | None = None
         self._direction: str | None = None
         self._direction_confidence = 0.0
 
+    def _reset(self) -> None:
+        self._last_direct = None
+        self._dropout_age = 0
+        self._outlet_geometry = None
+        self._direction = None
+        self._direction_confidence = 0.0
+
+    @staticmethod
+    def _geometry_is_consistent(
+        candidate: tuple[float, float, float],
+        previous: tuple[float, float, float],
+    ) -> bool:
+        candidate_x, candidate_top, candidate_width = candidate
+        previous_x, previous_top, previous_width = previous
+        width_ratio = candidate_width / max(previous_width, 1e-6)
+        return (
+            0.65 <= width_ratio <= 1.45
+            and abs(candidate_x - previous_x) <= 0.025
+            and abs(candidate_top - previous_top) <= 0.04
+        )
+
+    @staticmethod
+    def _normalized_geometry(
+        outlet: tuple[float, float, float],
+        width: int,
+        height: int,
+    ) -> tuple[float, float, float]:
+        center_x, top, gate_width = outlet
+        return center_x / width, top / height, gate_width / width
+
+    def _pixel_geometry(self, width: int, height: int) -> tuple[float, float, float] | None:
+        if self._outlet_geometry is None:
+            return None
+        center_x, top, gate_width = self._outlet_geometry
+        return center_x * width, top * height, gate_width * width
+
     def observe(self, source: str | Path | Image.Image, state: GameState) -> GameState:
         if state.screen != "game":
-            self._previous = None
-            self._direction = None
-            self._direction_confidence = 0.0
+            self._reset()
             return state
 
         image = source.copy() if isinstance(source, Image.Image) else Image.open(source)
@@ -771,33 +838,111 @@ class FeedTracker:
         if image.width < 400 or image.height < 800:
             return state
         hsv = np.asarray(image.convert("HSV"))
-        observed = state.feed
-        if observed.current is None:
-            observed = _read_feed(hsv)
-        if observed.current is None:
-            self._previous = None
-            return state
+        if _has_concealed_feed(hsv):
+            self._reset()
+            return replace(
+                state,
+                feed=FeedObservation(
+                    None,
+                    (None,),
+                    0.0,
+                    "concealed conveyor region; current and upcoming colors unknown",
+                    upcoming_status="concealed",
+                ),
+            )
 
-        previous = self._previous
-        if previous is not None and previous.current != observed.current:
-            visible_ahead = [color for color in previous.upcoming if color is not None]
-            if visible_ahead and observed.current == visible_ahead[0]:
-                self._direction = "from_left_toward_outlet"
-                self._direction_confidence = 0.86
-            elif observed.current in visible_ahead:
-                self._direction = "from_left_toward_outlet"
-                self._direction_confidence = 0.70
+        height, width = hsv.shape[:2]
+        outlet = _find_feed_outlet(hsv)
+        previous_geometry = self._pixel_geometry(width, height)
+        if outlet is not None and previous_geometry is not None:
+            normalized_candidate = self._normalized_geometry(outlet, width, height)
+            normalized_previous = self._outlet_geometry
+            if normalized_previous is not None and not self._geometry_is_consistent(
+                normalized_candidate,
+                normalized_previous,
+            ):
+                outlet = None
+        if outlet is not None:
+            self._outlet_geometry = self._normalized_geometry(outlet, width, height)
+            outlet_status = "direct"
+        else:
+            outlet = previous_geometry
+            outlet_status = "tracked" if outlet is not None else "unknown"
 
-        if self._direction is not None:
+        observed = _read_feed(hsv, outlet=outlet, outlet_status=outlet_status)
+        if observed.current is not None:
+            previous = self._last_direct
+            if previous is not None and previous.current != observed.current:
+                visible_ahead = [color for color in previous.upcoming if color is not None]
+                if visible_ahead and observed.current == visible_ahead[0]:
+                    self._direction = "from_left_toward_outlet"
+                    self._direction_confidence = 0.86
+                elif observed.current in visible_ahead:
+                    self._direction = "from_left_toward_outlet"
+                    self._direction_confidence = 0.70
+
+            if self._direction is not None:
+                observed = replace(
+                    observed,
+                    confidence=round(max(observed.confidence, self._direction_confidence), 3),
+                    source=f"{observed.source}; temporal advancement confirmed from left",
+                    direction=self._direction,
+                    direction_confidence=self._direction_confidence,
+                )
             observed = replace(
                 observed,
-                confidence=round(max(observed.confidence, self._direction_confidence), 3),
-                source=f"{observed.source}; temporal advancement confirmed from left",
-                direction=self._direction,
-                direction_confidence=self._direction_confidence,
+                current_status="direct",
+                upcoming_status="direct",
+                outlet_status=outlet_status,
+                age_frames=0,
             )
-        self._previous = state.feed if state.feed.current is not None else observed
-        return replace(state, feed=observed)
+            self._last_direct = observed
+            self._dropout_age = 0
+            return replace(state, feed=observed)
+
+        if observed.upcoming_status == "concealed":
+            self._reset()
+            return replace(state, feed=observed)
+
+        self._dropout_age += 1
+        if self._last_direct is not None and self._dropout_age <= self.MAX_CARRIED_FRAMES:
+            decay = self.CONFIDENCE_DECAY_PER_FRAME ** self._dropout_age
+            carried = replace(
+                self._last_direct,
+                confidence=round(self._last_direct.confidence * decay, 3),
+                direction_confidence=round(self._last_direct.direction_confidence * decay, 3),
+                source=(
+                    f"temporarily carried feed belief (age {self._dropout_age}/"
+                    f"{self.MAX_CARRIED_FRAMES} frames): {observed.source}"
+                ),
+                current_status="tracked",
+                upcoming_status="tracked" if self._last_direct.upcoming else "unknown",
+                outlet_status="tracked" if outlet is not None else "unknown",
+                age_frames=self._dropout_age,
+            )
+            return replace(state, feed=carried)
+
+        expired = replace(
+            observed,
+            current=None,
+            upcoming=(),
+            confidence=0.0,
+            source=(
+                f"{observed.source}; prior feed belief expired after "
+                f"{self.MAX_CARRIED_FRAMES} unresolved frames"
+            ),
+            direction=self._direction,
+            direction_confidence=round(
+                self._direction_confidence * self.CONFIDENCE_DECAY_PER_FRAME ** self._dropout_age,
+                3,
+            ),
+            current_status="unknown",
+            upcoming_status="unknown",
+            outlet_status=outlet_status,
+            age_frames=self._dropout_age,
+        )
+        self._last_direct = None
+        return replace(state, feed=expired)
 
 
 def analyze_frame(source: str | Path | Image.Image) -> GameState:

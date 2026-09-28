@@ -38,6 +38,49 @@ def _state(tiles, *, feed=None, locks=()):
 
 
 class PolicySampleTests(unittest.TestCase):
+    def test_attempted_candidate_identity_survives_tiny_bbox_jitter_and_new_tile_ids(self):
+        original_tile = _tile("tile-1", 120)
+        original_state = _state([original_tile])
+        original = policy_module.rank_candidates(original_state)[0]
+        jittered_tile = Tile(
+            id="regenerated-id",
+            bbox=(23, 117, 83, 177),
+            color=original_tile.color,
+            legality=original_tile.legality,
+            confidence=original_tile.confidence,
+            color_confidence=original_tile.color_confidence,
+            kind=original_tile.kind,
+            locked=original_tile.locked,
+        )
+        jittered_state = _state([jittered_tile])
+        retried = policy_module.rank_candidates(
+            jittered_state,
+            attempted=(original,),
+        )
+
+        self.assertEqual(original.key, policy_module.rank_candidates(jittered_state)[0].key)
+        self.assertEqual(retried, ())
+
+    def test_attempted_tile_is_reenabled_after_its_local_semantics_change(self):
+        tile = _tile("tile-1", 120)
+        state = _state([tile])
+        attempted = policy_module.rank_candidates(state)[0]
+        changed = _state([Tile(
+            id="new-id",
+            bbox=tile.bbox,
+            color=tile.color,
+            legality="RH",
+            confidence=tile.confidence,
+            color_confidence=tile.color_confidence,
+            kind="special",
+            locked=tile.locked,
+        )])
+
+        candidates = policy_module.rank_candidates(changed, attempted=(attempted,))
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].tile.kind, "special")
+
     def test_unknown_feed_still_returns_plausible_candidates(self):
         state = analyze_frame(SAMPLES / "level56_gameplay_large_grid.jpg")
 
