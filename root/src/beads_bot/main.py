@@ -17,6 +17,7 @@ from .vision import FeedTracker, analyze_frame
 
 
 _MAX_UNKNOWN_REOBSERVATIONS = 4
+_MAX_MOVE_LIMIT_OBSERVATIONS = 2
 
 
 def _boxes_overlap(first: tuple[int, int, int, int], second: tuple[int, int, int, int]) -> bool:
@@ -161,6 +162,8 @@ def _record_observation(
     interaction: InteractionOutcome = InteractionOutcome.NOT_ATTEMPTED,
     strategic: StrategicOutcome = StrategicOutcome.IN_PROGRESS,
     timings: dict[str, float] | None = None,
+    observation_reason: str | None = None,
+    observation_index: int | None = None,
 ) -> str:
     return recorder.record_step(
         before_state=state,
@@ -174,6 +177,8 @@ def _record_observation(
         strategic_outcome=strategic,
         timings_ms=timings or {},
         uncertain_assumptions=chosen.assumptions if chosen else (),
+        observation_reason=observation_reason,
+        observation_index=observation_index,
     )
 
 
@@ -498,6 +503,47 @@ def run_live(
                 continue
             return finish_attempt("success", "level completed; continuation did not leave the completion screen")
 
+        if max_moves is not None and action_count >= max_moves:
+            observation_state = state
+            observation_frame = frame
+            for observation_index in range(1, _MAX_MOVE_LIMIT_OBSERVATIONS + 1):
+                try:
+                    sleep_fn(max(0.0, args.settle_seconds))
+                    next_frame = capture_fn(args.adb, args.serial)
+                    next_state = observe_frame(next_frame)
+                except Exception as error:
+                    _record_observation(
+                        recorder,
+                        frame=observation_frame,
+                        state=observation_state,
+                        interaction=InteractionOutcome.UNKNOWN,
+                        strategic=StrategicOutcome.UNKNOWN,
+                        observation_reason="move_limit_boundary",
+                        observation_index=observation_index,
+                    )
+                    return finish_attempt("device_error", f"move-limit observation failed: {error}")
+
+                _, strategic = classify_transition(observation_state, next_state, None)
+                _record_observation(
+                    recorder,
+                    frame=observation_frame,
+                    state=observation_state,
+                    after_state=next_state,
+                    after_frame=next_frame.image,
+                    interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=strategic,
+                    timings={"verify_capture": next_frame.elapsed_ms},
+                    observation_reason="move_limit_boundary",
+                    observation_index=observation_index,
+                )
+                observation_state, observation_frame = next_state, next_frame.image
+                current_frame, current_state = next_frame, next_state
+                if next_state.screen != "game":
+                    break
+            else:
+                return finish_attempt("move_limit", "user move limit reached; final observations remained in game")
+            continue
+
         policy_started = time.perf_counter()
         candidates = rank_candidates(
             state,
@@ -524,15 +570,6 @@ def run_live(
                 timings={"policy": round(policy_ms, 2)},
             )
             return finish_attempt("dry_run", "execution is disabled")
-        if max_moves is not None and action_count >= max_moves:
-            _record_observation(
-                recorder, frame=frame, state=state, candidates=candidates, chosen=chosen,
-                interaction=InteractionOutcome.NOT_ATTEMPTED,
-                strategic=StrategicOutcome.IN_PROGRESS,
-                timings={"policy": round(policy_ms, 2)},
-            )
-            return finish_attempt("move_limit", "user move limit reached")
-
         click_started = time.perf_counter()
         try:
             click_ms = tap_fn(chosen.tile.center[0], chosen.tile.center[1], args.adb, args.serial)

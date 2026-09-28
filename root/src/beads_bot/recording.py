@@ -182,6 +182,8 @@ class RunRecorder:
         strategic_outcome: StrategicOutcome | str,
         timings_ms: Mapping[str, float],
         uncertain_assumptions: tuple[str, ...] = (),
+        observation_reason: str | None = None,
+        observation_index: int | None = None,
     ) -> str:
         if self._finished:
             raise RuntimeError("cannot append to a finalized run")
@@ -205,6 +207,11 @@ class RunRecorder:
             "uncertain_assumptions": list(uncertain_assumptions or (chosen.assumptions if chosen else ())),
             "frames": {"before": before_path, "after": after_path},
         }
+        if observation_reason is not None:
+            event["event_type"] = "observation"
+            event["observation_reason"] = observation_reason
+            if observation_index is not None:
+                event["observation_index"] = observation_index
         self._append_jsonl(self.events_path, event)
         self._events.append(event)
 

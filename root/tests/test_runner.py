@@ -107,8 +107,142 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual(len(taps), 1)
         self.assertEqual(taps[0], (50, 50))
         self.assertIsNone(state.feed.current)
-        self.assertEqual(captures, 2)
+        self.assertEqual(captures, 4)
         self.assertEqual(result["status"], "move_limit")
+
+    def test_move_limit_records_two_final_game_observations_without_another_tile_tap(self):
+        state = _state([_tile("first", 20), _tile("second", 120)])
+
+        result, taps, captures = self._run([state, state], max_moves=1)
+        events = [
+            json.loads(line)
+            for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()
+        ]
+        observations = [event for event in events if event.get("observation_reason") == "move_limit_boundary"]
+
+        self.assertEqual(result["status"], "move_limit")
+        self.assertEqual(result["action_count"], 1)
+        self.assertEqual(taps, [(50, 50)])
+        self.assertEqual(captures, 4)
+        self.assertEqual(len(observations), 2)
+        self.assertTrue(all(event.get("event_type") == "observation" for event in observations))
+        for event in observations:
+            self.assertIsNone(event["chosen"])
+            self.assertIsNone(event["tap"])
+            self.assertEqual(event["after_state"]["screen"], "game")
+            self.assertTrue((Path(result["run_dir"]) / event["frames"]["after"]).is_file())
+
+    def test_move_limit_delayed_out_of_space_enters_safe_recovery_before_finalizing(self):
+        game = _state([_tile("first", 20), _tile("second", 120)])
+        verified_game = _state([_tile("second", 120)])
+        offer = _state(
+            screen="out_of_space",
+            controls=(ScreenControl("close", (90, 90), 0.99),),
+            modal_substate="space_offer",
+        )
+        warning = _state(
+            screen="out_of_space",
+            controls=(ScreenControl("close", (91, 91), 0.99),),
+            modal_substate="life_warning",
+        )
+        resumed = _state([_tile("resumed", 120)])
+
+        result, taps, _ = self._run([game, verified_game, offer, warning, resumed], max_moves=1)
+        events = [
+            json.loads(line)
+            for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()
+        ]
+        boundary = next(event for event in events if event.get("observation_reason") == "move_limit_boundary")
+        recovery_events = [event for event in events if event["before_state"]["screen"] == "out_of_space"]
+
+        self.assertEqual(result["status"], "move_limit")
+        self.assertEqual(taps, [(50, 50), (90, 90), (91, 91)])
+        self.assertEqual(boundary["after_state"]["screen"], "out_of_space")
+        self.assertEqual(boundary["after_state"]["modal_substate"], "space_offer")
+        self.assertEqual([event["tap"] for event in recovery_events], [[90, 90], [91, 91]])
+        self.assertEqual(recovery_events[0]["after_state"]["modal_substate"], "life_warning")
+        self.assertEqual(recovery_events[1]["before_state"]["modal_substate"], "life_warning")
+        self.assertEqual(recovery_events[1]["after_state"]["screen"], "game")
+
+    def test_move_limit_delayed_failure_is_recorded_as_level_failure(self):
+        game = _state([_tile("last-action", 20), _tile("remaining", 120)])
+        verified_game = _state([_tile("remaining", 120)])
+        failure = _state(screen="failure")
+
+        result, taps, captures = self._run([game, verified_game, failure], max_moves=1)
+        events = [
+            json.loads(line)
+            for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()
+        ]
+        boundary = next(event for event in events if event.get("observation_reason") == "move_limit_boundary")
+        evidence = [
+            json.loads(line)
+            for line in (Path(self.temp.name) / "debug" / "mechanic_evidence.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+
+        self.assertEqual(result["status"], "failure")
+        self.assertEqual(result["action_count"], 1)
+        self.assertEqual(taps, [(50, 50)])
+        self.assertEqual(captures, 3)
+        self.assertEqual(boundary["after_state"]["screen"], "failure")
+        self.assertEqual(boundary["outcomes"]["strategic"], "LEVEL_FAILURE")
+        self.assertIn("LEVEL_FAILURE", [record.get("strategic_outcome") for record in evidence])
+
+    def test_second_move_limit_reobservation_catches_late_failure_animation(self):
+        game = _state([_tile("last-action", 20), _tile("remaining", 120)])
+        verified_game = _state([_tile("remaining", 120)])
+        failure = _state(screen="failure")
+
+        result, taps, captures = self._run([game, verified_game, verified_game, failure], max_moves=1)
+        events = [
+            json.loads(line)
+            for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()
+        ]
+        observations = [event for event in events if event.get("observation_reason") == "move_limit_boundary"]
+
+        self.assertEqual(result["status"], "failure")
+        self.assertEqual(taps, [(50, 50)])
+        self.assertEqual(captures, 4)
+        self.assertEqual(len(observations), 2)
+        self.assertEqual(observations[-1]["after_state"]["screen"], "failure")
+
+    def test_move_limit_delayed_completion_is_recorded_as_level_success(self):
+        game = _state([_tile("last-action", 20), _tile("remaining", 120)])
+        verified_game = _state([_tile("remaining", 120)])
+        complete = _state(screen="complete")
+
+        result, taps, captures = self._run([game, verified_game, complete], max_moves=1)
+        events = [
+            json.loads(line)
+            for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()
+        ]
+        boundary = next(event for event in events if event.get("observation_reason") == "move_limit_boundary")
+        evidence = [
+            json.loads(line)
+            for line in (Path(self.temp.name) / "debug" / "mechanic_evidence.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(taps, [(50, 50)])
+        self.assertEqual(captures, 3)
+        self.assertEqual(boundary["after_state"]["screen"], "complete")
+        self.assertEqual(boundary["outcomes"]["strategic"], "LEVEL_SUCCESS")
+        self.assertIn("LEVEL_SUCCESS", [record.get("strategic_outcome") for record in evidence])
+
+    def test_move_limit_allows_failure_navigation_after_cap(self):
+        game = _state([_tile("last-action", 20), _tile("remaining", 120)])
+        verified_game = _state([_tile("remaining", 120)])
+        failure = _state(
+            screen="failure",
+            controls=(ScreenControl("dismiss_failure", (92, 92), 0.99),),
+        )
+        unknown = _state(screen="unknown")
+
+        result, taps, _ = self._run([game, verified_game, failure, unknown], max_moves=1)
+
+        self.assertEqual(result["status"], "failure")
+        self.assertEqual(result["session_status"], "recovery_incomplete")
+        self.assertEqual(taps, [(50, 50), (92, 92)])
 
     def test_low_confidence_candidate_does_not_stop_execution(self):
         uncertain = _state([_tile("uncertain", 20, legality="UNKNOWN", confidence=0.2)])
@@ -126,7 +260,7 @@ class ContinuousRunnerTests(unittest.TestCase):
         result, taps, captures = self._run([initial, after_first, after_second], max_moves=2)
 
         self.assertEqual(len(taps), 2)
-        self.assertEqual(captures, 3)
+        self.assertEqual(captures, 5)
         self.assertEqual(result["action_count"], 2)
 
     def test_unchanged_action_tries_next_candidate_without_repeating(self):
@@ -139,7 +273,7 @@ class ContinuousRunnerTests(unittest.TestCase):
         actions = [event for event in events if event["chosen"] is not None]
 
         self.assertEqual(len(taps), 2)
-        self.assertEqual(captures, 3)
+        self.assertEqual(captures, 5)
         self.assertEqual([event["chosen"]["tile"]["id"] for event in actions], ["first", "second"])
         self.assertEqual([event["outcomes"]["interaction"] for event in actions], ["NO_CHANGE", "NO_CHANGE"])
 
@@ -393,7 +527,7 @@ class ContinuousRunnerTests(unittest.TestCase):
 
         self.assertEqual(taps[0], (160, 300))
         self.assertEqual(taps[1], (50, 50))
-        self.assertEqual(captures, 3)
+        self.assertEqual(captures, 5)
         self.assertEqual(result["action_count"], 1)
 
 
