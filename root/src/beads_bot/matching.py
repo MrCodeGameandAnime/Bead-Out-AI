@@ -72,6 +72,18 @@ def tile_semantics(tile: Tile) -> tuple[object, ...]:
     )
 
 
+def tile_interaction_state(tile: Tile) -> tuple[object, ...]:
+    """Return chosen-tile fields that currently prove an interaction."""
+    return (
+        tile.legality,
+        tile.kind,
+        tile.locked,
+        tile.number,
+        tile.occupancy,
+        tile.capacity,
+    )
+
+
 def lock_overlay_present(tile: Tile, locks: tuple[LockMarker, ...]) -> bool:
     """Report whether a lock marker overlaps the tile's physical cell."""
     left, top, right, bottom = tile.bbox

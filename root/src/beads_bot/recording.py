@@ -1,6 +1,6 @@
 """Incremental run journaling and outcome-specific mechanic evidence."""
 
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
 import json
@@ -23,13 +23,43 @@ from .matching import (
     lock_overlay_present,
     materially_changed_geometry,
     same_physical_tile,
-    tile_semantics,
+    tile_interaction_state,
 )
 
 
 RUN_SCHEMA_VERSION = 2
 EVIDENCE_SCHEMA_VERSION = 2
-ACCEPTANCE_MODEL_VERSION = "tile-local-v1"
+ACCEPTANCE_MODEL_VERSION = "tile-local-v2"
+
+
+class InteractionReason(str, Enum):
+    CHOSEN_DISAPPEARED = "chosen_disappeared"
+    CHOSEN_SEMANTICS_CHANGED = "chosen_semantics_changed"
+    CHOSEN_OVERLAY_CHANGED = "chosen_overlay_changed"
+    CHOSEN_GEOMETRY_CHANGED = "chosen_geometry_changed"
+    KNOWN_LOCAL_EFFECT = "known_local_effect"
+    AMBIGUOUS_LOCAL_CHANGE = "ambiguous_local_change"
+    NO_CHANGE = "no_change"
+    UNKNOWN = "unknown"
+    NOT_ATTEMPTED = "not_attempted"
+
+
+@dataclass(frozen=True)
+class TransitionClassification:
+    interaction: InteractionOutcome
+    strategic: StrategicOutcome
+    interaction_reason: InteractionReason
+    local_effect_observed: bool = False
+    local_effect_attribution: str = "none"
+
+
+_STRONG_ACCEPTANCE_REASONS = {
+    InteractionReason.CHOSEN_DISAPPEARED.value,
+    InteractionReason.CHOSEN_SEMANTICS_CHANGED.value,
+    InteractionReason.CHOSEN_OVERLAY_CHANGED.value,
+    InteractionReason.CHOSEN_GEOMETRY_CHANGED.value,
+    InteractionReason.KNOWN_LOCAL_EFFECT.value,
+}
 
 
 def _value(value):
@@ -79,24 +109,42 @@ def classify_transition(
     before_state: GameState,
     after_state: GameState | None,
     chosen: ActionCandidate | None,
-) -> tuple[InteractionOutcome, StrategicOutcome]:
+) -> TransitionClassification:
     """Separate action acceptance from level progress for one observed transition."""
     if after_state is None:
-        return InteractionOutcome.UNKNOWN, StrategicOutcome.UNKNOWN
+        return TransitionClassification(
+            InteractionOutcome.UNKNOWN,
+            StrategicOutcome.UNKNOWN,
+            InteractionReason.UNKNOWN,
+        )
 
+    local_effect_observed = False
+    local_effect_attribution = "none"
     if after_state.screen == "unknown":
         interaction = InteractionOutcome.UNKNOWN
+        interaction_reason = InteractionReason.UNKNOWN
     elif chosen is None:
         interaction = InteractionOutcome.NOT_ATTEMPTED
+        interaction_reason = InteractionReason.NOT_ATTEMPTED
     else:
         before_size = (before_state.width, before_state.height)
         after_size = (after_state.width, after_state.height)
+        local_effect_observed = local_neighborhood_changed(
+            chosen.tile,
+            before_state.tiles,
+            after_state.tiles,
+            before_size,
+            after_size,
+        )
+        if local_effect_observed:
+            local_effect_attribution = "ambiguous"
         matches = [
             tile for tile in after_state.tiles
             if same_physical_tile(chosen.tile, tile, before_size, after_size)
         ]
         if not matches:
             interaction = InteractionOutcome.ACTION_ACCEPTED
+            interaction_reason = InteractionReason.CHOSEN_DISAPPEARED
         else:
             matched = min(
                 matches,
@@ -106,22 +154,21 @@ def classify_transition(
                     + abs(chosen.tile.center[1] / before_state.height - tile.center[1] / after_state.height),
                 ),
             )
-            if (
-                tile_semantics(chosen.tile) != tile_semantics(matched)
-                or lock_overlay_present(chosen.tile, before_state.locks)
-                != lock_overlay_present(matched, after_state.locks)
-                or materially_changed_geometry(chosen.tile, matched, before_size, after_size)
-                or local_neighborhood_changed(
-                    chosen.tile,
-                    before_state.tiles,
-                    after_state.tiles,
-                    before_size,
-                    after_size,
-                )
-            ):
+            if lock_overlay_present(chosen.tile, before_state.locks) != lock_overlay_present(matched, after_state.locks):
                 interaction = InteractionOutcome.ACTION_ACCEPTED
+                interaction_reason = InteractionReason.CHOSEN_OVERLAY_CHANGED
+            elif tile_interaction_state(chosen.tile) != tile_interaction_state(matched):
+                interaction = InteractionOutcome.ACTION_ACCEPTED
+                interaction_reason = InteractionReason.CHOSEN_SEMANTICS_CHANGED
+            elif materially_changed_geometry(chosen.tile, matched, before_size, after_size):
+                interaction = InteractionOutcome.ACTION_ACCEPTED
+                interaction_reason = InteractionReason.CHOSEN_GEOMETRY_CHANGED
+            elif local_effect_observed:
+                interaction = InteractionOutcome.NO_CHANGE
+                interaction_reason = InteractionReason.AMBIGUOUS_LOCAL_CHANGE
             else:
                 interaction = InteractionOutcome.NO_CHANGE
+                interaction_reason = InteractionReason.NO_CHANGE
 
     if after_state.screen == "complete":
         strategic = StrategicOutcome.LEVEL_SUCCESS
@@ -137,7 +184,13 @@ def classify_transition(
         strategic = StrategicOutcome.IN_PROGRESS
     else:
         strategic = StrategicOutcome.UNKNOWN
-    return interaction, strategic
+    return TransitionClassification(
+        interaction=interaction,
+        strategic=strategic,
+        interaction_reason=interaction_reason,
+        local_effect_observed=local_effect_observed,
+        local_effect_attribution=local_effect_attribution,
+    )
 
 
 def _flatten_features(features: Mapping[str, object], prefix: str = "") -> dict[str, str]:
@@ -209,6 +262,9 @@ class RunRecorder:
         after_frame: Image.Image | None,
         interaction_outcome: InteractionOutcome | str,
         strategic_outcome: StrategicOutcome | str,
+        interaction_reason: InteractionReason | str | None = None,
+        local_effect_observed: bool | None = None,
+        local_effect_attribution: str | None = None,
         timings_ms: Mapping[str, float],
         uncertain_assumptions: tuple[str, ...] = (),
         observation_reason: str | None = None,
@@ -216,6 +272,34 @@ class RunRecorder:
     ) -> str:
         if self._finished:
             raise RuntimeError("cannot append to a finalized run")
+        transition = None
+        if chosen is not None and (
+            interaction_reason is None
+            or local_effect_observed is None
+            or local_effect_attribution is None
+        ):
+            transition = classify_transition(before_state, after_state, chosen)
+        if interaction_reason is None:
+            interaction_reason = (
+                transition.interaction_reason
+                if transition is not None
+                else InteractionReason.NOT_ATTEMPTED
+                if _outcome(interaction_outcome) == InteractionOutcome.NOT_ATTEMPTED.value
+                else InteractionReason.NO_CHANGE
+                if _outcome(interaction_outcome) == InteractionOutcome.NO_CHANGE.value
+                else InteractionReason.UNKNOWN
+            )
+        if local_effect_observed is None:
+            local_effect_observed = transition.local_effect_observed if transition is not None else False
+        if local_effect_attribution is None:
+            local_effect_attribution = transition.local_effect_attribution if transition is not None else "none"
+        interaction_reason = _outcome(interaction_reason)
+        if (
+            chosen is not None
+            and _outcome(interaction_outcome) == InteractionOutcome.ACTION_ACCEPTED.value
+            and interaction_reason not in _STRONG_ACCEPTANCE_REASONS
+        ):
+            interaction_outcome = InteractionOutcome.NO_CHANGE
         step_id = f"step-{len(self._events) + 1:06d}"
         before_path = self._save_frame(before_frame, step_id, "before")
         after_path = self._save_frame(after_frame, step_id, "after")
@@ -231,7 +315,10 @@ class RunRecorder:
             "after_state": _state_data(after_state),
             "outcomes": {
                 "interaction": _outcome(interaction_outcome),
+                "interaction_reason": interaction_reason,
                 "strategic": _outcome(strategic_outcome),
+                "local_effect_observed": local_effect_observed,
+                "local_effect_attribution": local_effect_attribution,
             },
             "timings_ms": _value(timings_ms),
             "uncertain_assumptions": list(uncertain_assumptions or (chosen.assumptions if chosen else ())),
@@ -255,6 +342,9 @@ class RunRecorder:
                     "record_type": "action",
                     **_context_data(chosen.context),
                     "interaction_outcome": interaction,
+                    "interaction_reason": interaction_reason,
+                    "local_effect_observed": local_effect_observed,
+                    "local_effect_attribution": local_effect_attribution,
                     "strategic_outcome": strategic if strategic == StrategicOutcome.LOCAL_PROGRESS.value else None,
                     "run_id": self.run_id,
                     "step_id": step_id,
@@ -282,7 +372,10 @@ class RunRecorder:
                 interaction = record.get("interaction_outcome")
                 strategic = record.get("strategic_outcome")
                 if record.get("acceptance_model_version") == ACCEPTANCE_MODEL_VERSION:
-                    if interaction == InteractionOutcome.ACTION_ACCEPTED.value:
+                    if (
+                        interaction == InteractionOutcome.ACTION_ACCEPTED.value
+                        and record.get("interaction_reason") in _STRONG_ACCEPTANCE_REASONS
+                    ):
                         counts["action_accepted"] += 1
                     elif interaction == InteractionOutcome.NO_CHANGE.value:
                         counts["no_change"] += 1
@@ -306,6 +399,7 @@ class RunRecorder:
                     "score": event["chosen"]["score"],
                     "confidence": event["chosen"]["confidence"],
                     "interaction_outcome": event["outcomes"]["interaction"],
+                    "interaction_reason": event["outcomes"]["interaction_reason"],
                 }
                 for event in self._events
                 if event["chosen"] is not None

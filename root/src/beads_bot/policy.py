@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, Literal
 
 from .board import EvidenceContext, EvidenceTally, GameState, Tile
-from .matching import materially_changed_geometry, same_physical_tile, tile_semantics
+from .matching import materially_changed_geometry, same_physical_tile, tile_interaction_state
 
 
 EvidenceStatus = Literal["KNOWN", "LIKELY", "UNCERTAIN", "UNKNOWN"]
@@ -290,8 +290,13 @@ def _matches_attempt(
     return (
         same_physical_tile(prior.tile, candidate.tile, size, size)
         and not materially_changed_geometry(prior.tile, candidate.tile, size, size)
-        and tile_semantics(prior.tile) == tile_semantics(candidate.tile)
+        and _candidate_attempt_state(prior) == _candidate_attempt_state(candidate)
     )
+
+
+def _candidate_attempt_state(candidate: ActionCandidate) -> tuple[object, ...]:
+    lock_overlap = candidate.context.features.get("lock_overlap", candidate.tile.locked)
+    return (*tile_interaction_state(candidate.tile), lock_overlap)
 
 
 def rank_candidates(
@@ -330,7 +335,8 @@ def prune_attempted(state: GameState, attempted: list[ActionCandidate]) -> None:
         if any(
             same_physical_tile(prior.tile, tile, size, size)
             and not materially_changed_geometry(prior.tile, tile, size, size)
-            and tile_semantics(prior.tile) == tile_semantics(tile)
+            and _candidate_attempt_state(prior)
+            == (*tile_interaction_state(tile), _lock_relation(state, tile)[0])
             for tile in state.tiles
         )
     ]

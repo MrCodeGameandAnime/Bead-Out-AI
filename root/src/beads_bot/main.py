@@ -161,6 +161,9 @@ def _record_observation(
     after_frame: Image.Image | None = None,
     interaction: InteractionOutcome = InteractionOutcome.NOT_ATTEMPTED,
     strategic: StrategicOutcome = StrategicOutcome.IN_PROGRESS,
+    interaction_reason: str | None = None,
+    local_effect_observed: bool | None = None,
+    local_effect_attribution: str | None = None,
     timings: dict[str, float] | None = None,
     observation_reason: str | None = None,
     observation_index: int | None = None,
@@ -175,6 +178,9 @@ def _record_observation(
         after_frame=after_frame,
         interaction_outcome=interaction,
         strategic_outcome=strategic,
+        interaction_reason=interaction_reason,
+        local_effect_observed=local_effect_observed,
+        local_effect_attribution=local_effect_attribution,
         timings_ms=timings or {},
         uncertain_assumptions=chosen.assumptions if chosen else (),
         observation_reason=observation_reason,
@@ -420,15 +426,18 @@ def run_live(
                     timings={"verify_capture": 0.0},
                 )
                 return finish_attempt("device_error", f"passive screen re-observation failed: {error}")
-            interaction, strategic = classify_transition(state, next_state, None)
+            transition = classify_transition(state, next_state, None)
             _record_observation(
                 recorder,
                 frame=frame,
                 state=state,
                 after_state=next_state,
                 after_frame=next_frame.image,
-                interaction=interaction,
-                strategic=strategic,
+                interaction=transition.interaction,
+                strategic=transition.strategic,
+                interaction_reason=transition.interaction_reason,
+                local_effect_observed=transition.local_effect_observed,
+                local_effect_attribution=transition.local_effect_attribution,
                 timings={"verify_capture": next_frame.elapsed_ms},
             )
             unknown_reobservations = (
@@ -513,7 +522,7 @@ def run_live(
                     )
                     return finish_attempt("device_error", f"move-limit observation failed: {error}")
 
-                _, strategic = classify_transition(observation_state, next_state, None)
+                transition = classify_transition(observation_state, next_state, None)
                 _record_observation(
                     recorder,
                     frame=observation_frame,
@@ -521,7 +530,10 @@ def run_live(
                     after_state=next_state,
                     after_frame=next_frame.image,
                     interaction=InteractionOutcome.NOT_ATTEMPTED,
-                    strategic=strategic,
+                    strategic=transition.strategic,
+                    interaction_reason=transition.interaction_reason,
+                    local_effect_observed=transition.local_effect_observed,
+                    local_effect_attribution=transition.local_effect_attribution,
                     timings={"verify_capture": next_frame.elapsed_ms},
                     observation_reason="move_limit_boundary",
                     observation_index=observation_index,
@@ -584,7 +596,7 @@ def run_live(
             )
             return finish_attempt("device_error", f"action execution failed: {error}")
 
-        interaction, strategic = classify_transition(state, next_state, chosen)
+        transition = classify_transition(state, next_state, chosen)
         _record_observation(
             recorder,
             frame=frame,
@@ -594,8 +606,11 @@ def run_live(
             tap_point=chosen.tile.center,
             after_state=next_state,
             after_frame=next_frame.image,
-            interaction=interaction,
-            strategic=strategic,
+            interaction=transition.interaction,
+            strategic=transition.strategic,
+            interaction_reason=transition.interaction_reason,
+            local_effect_observed=transition.local_effect_observed,
+            local_effect_attribution=transition.local_effect_attribution,
             timings={
                 "capture": current_frame.elapsed_ms,
                 "policy": round(policy_ms, 2),
@@ -604,7 +619,7 @@ def run_live(
             },
         )
         current_frame, current_state = next_frame, next_state
-        if interaction == InteractionOutcome.NO_CHANGE:
+        if transition.interaction == InteractionOutcome.NO_CHANGE:
             attempted.append(chosen)
 
 

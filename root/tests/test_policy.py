@@ -81,6 +81,37 @@ class PolicySampleTests(unittest.TestCase):
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0].tile.kind, "special")
 
+    def test_attempted_tile_stays_suppressed_after_color_classifier_change(self):
+        tile = _tile("tile-1", 120, color="blue")
+        state = _state([tile])
+        attempted = policy_module.rank_candidates(state)[0]
+        color_jitter = _state([Tile(
+            id="new-id",
+            bbox=tile.bbox,
+            color="cyan",
+            legality=tile.legality,
+            confidence=tile.confidence,
+            color_confidence=tile.color_confidence,
+            kind=tile.kind,
+            locked=tile.locked,
+        )])
+
+        candidates = policy_module.rank_candidates(color_jitter, attempted=(attempted,))
+
+        self.assertEqual(candidates, ())
+
+    def test_attempted_tile_is_reenabled_when_its_own_lock_overlay_changes(self):
+        tile = _tile("tile-1", 120)
+        state = _state([tile])
+        attempted = policy_module.rank_candidates(state)[0]
+        lock = LockMarker("new-lock", tile.bbox, tile.center, 0.9)
+        changed = _state([tile], locks=(lock,))
+
+        candidates = policy_module.rank_candidates(changed, attempted=(attempted,))
+
+        self.assertEqual(len(candidates), 1)
+        self.assertTrue(candidates[0].context.features["lock_overlap"])
+
     def test_unknown_feed_still_returns_plausible_candidates(self):
         state = analyze_frame(SAMPLES / "level56_gameplay_large_grid.jpg")
 

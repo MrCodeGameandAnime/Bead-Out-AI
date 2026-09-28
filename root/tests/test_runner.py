@@ -319,7 +319,7 @@ class ContinuousRunnerTests(unittest.TestCase):
 
     def test_progress_resets_attempts_for_a_changed_state(self):
         before = _state([_tile("same", 20, color="green")])
-        changed = _state([_tile("same", 20, color="blue")])
+        changed = _state([_tile("same", 20, color="green", legality="UNKNOWN")])
         after_second = _state([])
 
         result, taps, _ = self._run([before, changed, after_second], max_moves=2)
@@ -328,7 +328,7 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual(len(taps), 2)
         self.assertEqual(events[0]["chosen"]["key"], events[1]["chosen"]["key"])
         self.assertEqual(events[0]["chosen"]["tile"]["color"], "green")
-        self.assertEqual(events[1]["chosen"]["tile"]["color"], "blue")
+        self.assertEqual(events[1]["chosen"]["tile"]["legality"], "UNKNOWN")
 
     def test_exhausted_unchanged_candidates_stop_without_retry(self):
         state = _state([_tile("first", 20), _tile("second", 120)])
