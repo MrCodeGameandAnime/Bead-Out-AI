@@ -39,7 +39,132 @@ def _state(tiles, *, feed=None, locks=()):
     )
 
 
+def _feed(current, upcoming, *, confidence=0.9, source="visible conveyor",
+          current_status="direct", upcoming_status="direct", age_frames=0,
+          direction="from_left_toward_outlet", direction_confidence=0.9):
+    return FeedObservation(
+        current=current,
+        upcoming=tuple(upcoming),
+        confidence=confidence,
+        source=source,
+        current_status=current_status,
+        upcoming_status=upcoming_status,
+        direction=direction,
+        direction_confidence=direction_confidence,
+        age_frames=age_frames,
+    )
+
+
 class PolicySampleTests(unittest.TestCase):
+    def test_same_tile_and_same_semantic_feed_context_stays_suppressed(self):
+        tile = _tile("target", 100, color="blue")
+        feed = _feed("indigo", ("blue", "indigo", "blue", None))
+        attempted = policy_module.rank_candidates(_state([tile], feed=feed))[0]
+
+        self.assertEqual(
+            policy_module.rank_candidates(_state([tile], feed=feed), attempted=(attempted,)),
+            (),
+        )
+        retry_context = attempted.context.features["retry_context"]
+        self.assertEqual(attempted.context.features["retry_context_version"], "context-v1")
+        self.assertEqual(retry_context["feed"], {"current": "indigo", "upcoming": ("blue", "indigo", "blue")})
+
+    def test_feed_confidence_status_source_and_age_noise_keep_suppression(self):
+        tile = _tile("target", 100, color="blue")
+        direct = _feed("indigo", ("blue", "indigo", "blue", None))
+        attempted = policy_module.rank_candidates(_state([tile], feed=direct))[0]
+        carried = _feed(
+            "indigo", ("blue", "indigo", "blue", None), confidence=0.41,
+            source="temporarily carried after outlet dropout", current_status="tracked",
+            upcoming_status="tracked", age_frames=2, direction_confidence=0.52,
+        )
+
+        self.assertEqual(policy_module.rank_candidates(_state([tile], feed=carried), attempted=(attempted,)), ())
+
+    def test_material_current_feed_change_reenables_same_physical_tile(self):
+        tile = _tile("target", 100, color="blue")
+        first = _feed("indigo", ("blue", "indigo", "blue"))
+        changed = _feed("white", ("teal", "cyan", "indigo"))
+        attempted = policy_module.rank_candidates(_state([tile], feed=first))[0]
+
+        candidates = policy_module.rank_candidates(_state([tile], feed=changed), attempted=(attempted,))
+
+        self.assertEqual([candidate.tile.id for candidate in candidates], ["target"])
+
+    def test_material_upcoming_order_change_reenables_even_when_current_is_same(self):
+        tile = _tile("target", 100, color="blue")
+        first = _feed("indigo", ("blue", "indigo", "blue"))
+        changed = _feed("indigo", ("pink", "teal", "white"))
+        attempted = policy_module.rank_candidates(_state([tile], feed=first))[0]
+
+        candidates = policy_module.rank_candidates(_state([tile], feed=changed), attempted=(attempted,))
+
+        self.assertEqual([candidate.tile.id for candidate in candidates], ["target"])
+
+    def test_unknown_feed_dropout_does_not_reenable_or_storm_retries(self):
+        tile = _tile("target", 100, color="blue")
+        first = _feed("indigo", ("blue", "indigo", "blue"))
+        unknown = _feed(None, (None, None, None), confidence=0.0, source="outlet unavailable",
+                        current_status="unknown", upcoming_status="unknown")
+        attempted = policy_module.rank_candidates(_state([tile], feed=first))[0]
+
+        self.assertEqual(policy_module.rank_candidates(_state([tile], feed=unknown), attempted=(attempted,)), ())
+        self.assertEqual(policy_module.rank_candidates(_state([tile], feed=first), attempted=(attempted,)), ())
+
+    def test_unknown_attempt_becomes_eligible_when_useful_feed_appears(self):
+        tile = _tile("target", 100, color="blue")
+        unknown = _feed(None, (None, None), confidence=0.0, source="concealed feed",
+                        current_status="unknown", upcoming_status="unknown")
+        resolved = _feed("white", ("teal", "cyan", "indigo"))
+        attempted = policy_module.rank_candidates(_state([tile], feed=unknown))[0]
+
+        candidates = policy_module.rank_candidates(_state([tile], feed=resolved), attempted=(attempted,))
+
+        self.assertEqual([candidate.tile.id for candidate in candidates], ["target"])
+
+    def test_unrelated_distant_tile_change_does_not_reenable_candidate(self):
+        tile = _tile("target", 100, color="blue")
+        distant = _tile("distant", 570, color="red", legality="DNH")
+        feed = _feed("indigo", ("blue", "indigo", "blue"))
+        attempted = policy_module.rank_candidates(_state([tile, distant], feed=feed))[0]
+
+        candidates = policy_module.rank_candidates(_state([tile], feed=feed), attempted=(attempted,))
+
+        self.assertEqual(candidates, ())
+
+    def test_each_new_feed_context_is_attempted_once_and_old_contexts_stay_suppressed(self):
+        tile = _tile("target", 100, color="blue")
+        first = _feed("indigo", ("blue", "indigo", "blue"))
+        second = _feed("white", ("teal", "cyan", "indigo"))
+        first_attempt = policy_module.rank_candidates(_state([tile], feed=first))[0]
+        second_candidate = policy_module.rank_candidates(_state([tile], feed=second), attempted=(first_attempt,))[0]
+
+        self.assertEqual(
+            policy_module.rank_candidates(_state([tile], feed=second), attempted=(first_attempt, second_candidate)),
+            (),
+        )
+        self.assertEqual(
+            policy_module.rank_candidates(_state([tile], feed=first), attempted=(first_attempt, second_candidate)),
+            (),
+        )
+
+    def test_pruning_preserves_feed_context_history_when_same_tile_remains(self):
+        tile = _tile("target", 100, color="blue")
+        first = _feed("indigo", ("blue", "indigo", "blue"))
+        second = _feed("white", ("teal", "cyan", "indigo"))
+        attempts = [policy_module.rank_candidates(_state([tile], feed=first))[0]]
+
+        policy_module.prune_attempted(_state([tile], feed=second), attempts)
+        second_context_candidate = policy_module.rank_candidates(
+            _state([tile], feed=second), attempted=attempts,
+        )[0]
+        attempts.append(second_context_candidate)
+        policy_module.prune_attempted(_state([tile], feed=first), attempts)
+
+        self.assertEqual(len(attempts), 2)
+        self.assertEqual(policy_module.rank_candidates(_state([tile], feed=first), attempted=attempts), ())
+        self.assertEqual(policy_module.rank_candidates(_state([tile], feed=second), attempted=attempts), ())
+
     def test_key_overlay_is_explicit_in_context_and_adds_uncertainty(self):
         ordinary = _tile("ordinary", 100, color="orange")
         key = _tile("key", 100, color="orange", mechanic_overlays=("key",))

@@ -18,6 +18,7 @@ _REQUIREMENT_WEIGHTS = {
     "other_mechanics": 0.04,
 }
 _POSITION_KEY_BUCKETS = 25
+_RETRY_CONTEXT_VERSION = "context-v1"
 
 
 @dataclass(frozen=True)
@@ -193,6 +194,13 @@ def _neighbor_features(state: GameState, tile: Tile) -> list[dict[str, object]]:
     return [item[1] for item in neighbors]
 
 
+def _meaningful_upcoming(upcoming: Iterable[str | None]) -> tuple[str | None, ...]:
+    """Drop only concealed tail slots; internal unknown positions retain their order."""
+    values = tuple(upcoming)
+    last_visible = max((index for index, color in enumerate(values) if color is not None), default=-1)
+    return values[:last_visible + 1]
+
+
 def _context(state: GameState, tile: Tile) -> EvidenceContext:
     left, top, right, bottom = tile.bbox
     board = state.board_region or (0, 0, state.width, state.height)
@@ -200,6 +208,14 @@ def _context(state: GameState, tile: Tile) -> EvidenceContext:
     bw, bh = max(1, bx1 - bx0), max(1, by1 - by0)
     cx, cy = tile.center
     locked, _, _ = _lock_relation(state, tile)
+    retry_context = {
+        "tile_state": tile_interaction_state(tile),
+        "lock_overlap": locked,
+        "feed": {
+            "current": state.feed.current,
+            "upcoming": _meaningful_upcoming(state.feed.upcoming),
+        },
+    }
     if tile.color == state.feed.current and state.feed.current is not None:
         feed_match = "current"
         feed_match_offset = 0
@@ -229,6 +245,8 @@ def _context(state: GameState, tile: Tile) -> EvidenceContext:
             "feed_class": "known" if state.feed.current is not None else "unknown",
             "feed_match": feed_match,
             "feed_match_offset": feed_match_offset,
+            "retry_context_version": _RETRY_CONTEXT_VERSION,
+            "retry_context": retry_context,
             "local_geometry": {
                 "x": round((cx - bx0) / bw, 3),
                 "y": round((cy - by0) / bh, 3),
@@ -304,12 +322,60 @@ def _matches_attempt(
         same_physical_tile(prior.tile, candidate.tile, size, size)
         and not materially_changed_geometry(prior.tile, candidate.tile, size, size)
         and _candidate_attempt_state(prior) == _candidate_attempt_state(candidate)
+        and _feed_context_still_applies(
+            _candidate_retry_feed(prior),
+            _candidate_retry_feed(candidate),
+        )
     )
 
 
 def _candidate_attempt_state(candidate: ActionCandidate) -> tuple[object, ...]:
     lock_overlap = candidate.context.features.get("lock_overlap", candidate.tile.locked)
     return (*tile_interaction_state(candidate.tile), lock_overlap)
+
+
+def _candidate_retry_feed(candidate: ActionCandidate) -> tuple[str | None, tuple[str | None, ...]]:
+    retry_context = candidate.context.features.get("retry_context")
+    if isinstance(retry_context, dict):
+        feed = retry_context.get("feed")
+        if isinstance(feed, dict):
+            return feed.get("current"), tuple(feed.get("upcoming", ()))
+    return (
+        candidate.context.features.get("feed_current"),
+        _meaningful_upcoming(candidate.context.features.get("feed_upcoming", ())),
+    )
+
+
+def _is_prefix(first: tuple[str | None, ...], second: tuple[str | None, ...]) -> bool:
+    return len(first) <= len(second) and second[:len(first)] == first
+
+
+def _feed_context_still_applies(
+    previous: tuple[str | None, tuple[str | None, ...]],
+    current: tuple[str | None, tuple[str | None, ...]],
+) -> bool:
+    """Whether a NO_CHANGE still applies, ignoring feed confidence and dropout noise."""
+    if previous == current:
+        return True
+
+    previous_current, previous_upcoming = previous
+    current_current, current_upcoming = current
+
+    # Losing all feed visibility is a reduction in knowledge, not new evidence
+    # that warrants retrying every failed tile.
+    if current_current is None and not current_upcoming:
+        return True
+    if previous_current is None and not previous_upcoming:
+        return False
+
+    # A carried/partial observation may lose the tail of a known sequence. Keep
+    # suppression while that observation is only a prefix of the prior belief.
+    if current_current is None and _is_prefix(current_upcoming, previous_upcoming):
+        return True
+    if current_current == previous_current and _is_prefix(current_upcoming, previous_upcoming):
+        return True
+
+    return False
 
 
 def rank_candidates(
@@ -341,15 +407,13 @@ def rank_candidates(
 
 
 def prune_attempted(state: GameState, attempted: list[ActionCandidate]) -> None:
-    """Forget no-change taps once their physical tile disappears or changes state."""
+    """Keep per-context attempts while the same physical tile remains present."""
     size = (state.width, state.height)
     attempted[:] = [
         prior for prior in attempted
         if any(
             same_physical_tile(prior.tile, tile, size, size)
             and not materially_changed_geometry(prior.tile, tile, size, size)
-            and _candidate_attempt_state(prior)
-            == (*tile_interaction_state(tile), _lock_relation(state, tile)[0])
             for tile in state.tiles
         )
     ]

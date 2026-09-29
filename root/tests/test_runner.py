@@ -15,7 +15,7 @@ def _tile(tile_id, y, *, color="green", legality="RH", confidence=0.9):
     return Tile(tile_id, (20, y, 80, y + 60), color, legality, confidence, 0.9)
 
 
-def _state(tiles=(), *, screen="game", controls=(), modal_substate=None):
+def _state(tiles=(), *, screen="game", controls=(), modal_substate=None, feed=None):
     tiles = tuple(tiles)
     board = None if not tiles else (
         min(tile.bbox[0] for tile in tiles),
@@ -29,7 +29,7 @@ def _state(tiles=(), *, screen="game", controls=(), modal_substate=None):
         height=500,
         tiles=tiles,
         board_region=board,
-        feed=FeedObservation(None, (), 0.0, "unresolved"),
+        feed=feed or FeedObservation(None, (), 0.0, "unresolved"),
         controls=tuple(controls),
         modal_substate=modal_substate,
     )
@@ -277,10 +277,12 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual([event["chosen"]["tile"]["id"] for event in actions], ["first", "second"])
         self.assertEqual([event["outcomes"]["interaction"] for event in actions], ["NO_CHANGE", "NO_CHANGE"])
 
-    def test_bbox_jitter_feed_change_and_unrelated_tile_change_do_not_retry_same_candidate(self):
+    def test_bbox_jitter_feed_metadata_noise_and_unrelated_tile_change_do_not_retry_same_candidate(self):
         chosen = _tile("chosen", 20)
         other = _tile("other", 120, color="blue")
-        before = _state([chosen, other])
+        before = _state([chosen, other], feed=FeedObservation(
+            "red", (), 0.55, "initial direct observation", current_status="direct",
+        ))
         moved = Tile(
             id="regenerated-id",
             bbox=(23, 23, 83, 83),
@@ -302,7 +304,7 @@ class ContinuousRunnerTests(unittest.TestCase):
                 color_confidence=other.color_confidence,
             )),
             board_region=(20, 23, 83, 180),
-            feed=FeedObservation("red", (), 0.9, "visible outlet"),
+            feed=FeedObservation("red", (), 0.9, "tracked after outlet reacquisition", current_status="tracked"),
         )
 
         result, taps, _ = self._run([before, after], max_moves=None)
@@ -338,6 +340,39 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual(len(taps), 2)
         self.assertEqual(captures, 3)
         self.assertEqual(result["status"], "no_progress")
+
+    def test_level80_feed_change_reconsiders_previously_unchanged_physical_tile(self):
+        feed_a = FeedObservation(
+            "indigo", ("pink", "teal", "white", None), 0.9, "visible outlet",
+            current_status="direct", upcoming_status="direct",
+        )
+        feed_b = FeedObservation(
+            "white", ("teal", "cyan", "indigo", None), 0.9, "visible outlet",
+            current_status="direct", upcoming_status="direct",
+        )
+        tiles = [_tile("target", 20, color="pink"), _tile("other", 120, color="orange")]
+        initial = _state(tiles, feed=feed_a)
+        unchanged_a = _state(tiles, feed=feed_a)
+        advanced_b = _state(tiles, feed=feed_b)
+
+        result, taps, _ = self._run(
+            [initial, unchanged_a, advanced_b, advanced_b], max_moves=None
+        )
+        events = [
+            json.loads(line)
+            for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()
+        ]
+        actions = [event for event in events if event.get("chosen") is not None]
+
+        self.assertEqual(result["status"], "no_progress")
+        self.assertEqual(len(taps), 4)
+        self.assertEqual(
+            [event["chosen"]["tile"]["id"] for event in actions],
+            ["target", "other", "target", "other"],
+        )
+        self.assertTrue(all(event["outcomes"]["interaction"] == "NO_CHANGE" for event in actions))
+        self.assertEqual(actions[0]["before_state"]["feed"]["current"], "indigo")
+        self.assertEqual(actions[2]["before_state"]["feed"]["current"], "white")
 
     def test_key_overlay_change_is_in_runner_state_signature(self):
         plain = _tile("stable-id", 30)
