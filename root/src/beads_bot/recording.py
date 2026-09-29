@@ -154,7 +154,11 @@ def classify_transition(
                     + abs(chosen.tile.center[1] / before_state.height - tile.center[1] / after_state.height),
                 ),
             )
-            if lock_overlay_present(chosen.tile, before_state.locks) != lock_overlay_present(matched, after_state.locks):
+            if (
+                lock_overlay_present(chosen.tile, before_state.locks)
+                != lock_overlay_present(matched, after_state.locks)
+                or tuple(chosen.tile.mechanic_overlays) != tuple(matched.mechanic_overlays)
+            ):
                 interaction = InteractionOutcome.ACTION_ACCEPTED
                 interaction_reason = InteractionReason.CHOSEN_OVERLAY_CHANGED
             elif tile_interaction_state(chosen.tile) != tile_interaction_state(matched):

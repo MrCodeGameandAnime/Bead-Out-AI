@@ -314,6 +314,35 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual(lost.interaction, InteractionOutcome.ACTION_ACCEPTED)
         self.assertEqual(lost.interaction_reason, "chosen_overlay_changed")
 
+    def test_key_overlay_disappearance_is_strong_chosen_tile_acceptance_and_is_journaled(self):
+        key_tile = replace(self.candidate.tile, mechanic_overlays=("key",))
+        before = _state([key_tile])
+        candidate = rank_candidates(before)[0]
+        after = _state([replace(key_tile, mechanic_overlays=())])
+
+        transition = classify_transition(before, after, candidate)
+        self._record(
+            before=before,
+            after=after,
+            candidates=(candidate,),
+            chosen=candidate,
+            tap=key_tile.center,
+            interaction=transition.interaction,
+            interaction_reason=transition.interaction_reason,
+        )
+        event = json.loads(self.recorder.events_path.read_text(encoding="utf-8").splitlines()[0])
+        evidence = json.loads(self.recorder.evidence_path.read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(transition.interaction, InteractionOutcome.ACTION_ACCEPTED)
+        self.assertEqual(transition.interaction_reason, "chosen_overlay_changed")
+        self.assertEqual(event["acceptance_model_version"], "tile-local-v2")
+        self.assertEqual(event["before_state"]["tiles"][0]["mechanic_overlays"], ["key"])
+        self.assertEqual(event["candidates"][0]["tile"]["mechanic_overlays"], ["key"])
+        self.assertEqual(event["after_state"]["tiles"][0]["mechanic_overlays"], [])
+        self.assertEqual(evidence["features"]["mechanic_overlay"], "key")
+        self.assertEqual(evidence["features"]["mechanic_rule_status"], "UNKNOWN")
+        self.assertEqual(evidence["interaction_reason"], "chosen_overlay_changed")
+
     def test_unrelated_lock_marker_change_is_not_attributed_to_chosen_tile(self):
         lock = LockMarker("new-lock", (150, 140, 180, 170), (165, 155), 0.9)
         after = _state([self.candidate.tile], locks=(lock,))

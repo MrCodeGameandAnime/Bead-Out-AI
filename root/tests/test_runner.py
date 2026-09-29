@@ -339,6 +339,23 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual(captures, 3)
         self.assertEqual(result["status"], "no_progress")
 
+    def test_key_overlay_change_is_in_runner_state_signature(self):
+        plain = _tile("stable-id", 30)
+        marked = Tile(
+            id=plain.id,
+            bbox=plain.bbox,
+            color=plain.color,
+            legality=plain.legality,
+            confidence=plain.confidence,
+            color_confidence=plain.color_confidence,
+            mechanic_overlays=("key",),
+        )
+
+        self.assertNotEqual(
+            main_module._state_signature(_state([plain])),
+            main_module._state_signature(_state([marked])),
+        )
+
     def test_out_of_space_page_transition_is_progress_but_repeated_page_is_no_change(self):
         close = (ScreenControl("close", (90, 90), 0.99),)
         offer = _state(screen="out_of_space", controls=close, modal_substate="space_offer")

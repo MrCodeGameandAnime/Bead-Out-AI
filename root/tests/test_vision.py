@@ -1,6 +1,8 @@
 from pathlib import Path
 import unittest
 from unittest.mock import patch
+
+import numpy as np
 from PIL import Image
 
 from beads_bot.board import FeedObservation, GameState
@@ -231,6 +233,41 @@ class VisionSampleTests(unittest.TestCase):
         self.assertEqual(second_state.feed.current, "indigo")
         self.assertEqual(second_state.feed.direction, "from_left_toward_outlet")
         self.assertGreater(second_state.feed.direction_confidence, 0.65)
+
+    def test_level80_key_overlay_is_attached_to_the_visually_marked_tiles(self):
+        state = analyze_frame(SAMPLES / "level80_feed_before_action_01.jpg")
+
+        keyed = {tile.center for tile in state.tiles if "key" in tile.mechanic_overlays}
+        self.assertEqual(keyed, {(804, 1468), (672, 1616), (408, 1753)})
+        # The ordinary orange tile, red/green/blue padlocks, and hidden tiles
+        # are useful nearby negatives in this same raw live frame.
+        for center in ((540, 1610), (276, 1474), (276, 1883), (672, 1916), (805, 1623)):
+            tile = self._tile_near(state, center)
+            self.assertNotIn("key", tile.mechanic_overlays, center)
+
+    def test_level80_key_detector_survives_small_tile_bbox_jitter(self):
+        from beads_bot.vision import _detect_tile_mechanic_overlays
+
+        image = Image.open(SAMPLES / "level80_feed_before_action_01.jpg").convert("RGB")
+        hsv = np.asarray(image.convert("HSV"))
+        expected = ((745, 1407, 863, 1529), (613, 1555, 731, 1677), (349, 1683, 467, 1824))
+        for box in expected:
+            for dx, dy in ((1, -1), (-2, 3), (3, 2)):
+                shifted = (box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy)
+                with self.subTest(box=box, shift=(dx, dy)):
+                    self.assertIn("key", _detect_tile_mechanic_overlays(hsv, shifted))
+
+    def test_level80_second_live_frame_keeps_key_association_after_board_evolution(self):
+        state = analyze_frame(SAMPLES / "level80_feed_before_action_02.jpg")
+
+        keyed = [tile for tile in state.tiles if "key" in tile.mechanic_overlays]
+        self.assertEqual(len(keyed), 3)
+        self.assertEqual({tile.color for tile in keyed}, {"blue", "orange", "cyan"})
+        for expected_center in ((804, 1468), (672, 1616), (408, 1753)):
+            tile = min(keyed, key=lambda item: abs(item.center[0] - expected_center[0])
+                       + abs(item.center[1] - expected_center[1]))
+            self.assertLessEqual(abs(tile.center[0] - expected_center[0]), 8)
+            self.assertLessEqual(abs(tile.center[1] - expected_center[1]), 16)
 
     def test_level80_evolving_frame_reads_visible_bead_at_tracked_outlet_geometry(self):
         tracker = FeedTracker()

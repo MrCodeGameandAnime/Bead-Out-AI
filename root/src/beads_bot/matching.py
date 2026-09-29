@@ -69,6 +69,7 @@ def tile_semantics(tile: Tile) -> tuple[object, ...]:
         tile.number,
         tile.occupancy,
         tile.capacity,
+        tuple(tile.mechanic_overlays),
     )
 
 
@@ -81,6 +82,7 @@ def tile_interaction_state(tile: Tile) -> tuple[object, ...]:
         tile.number,
         tile.occupancy,
         tile.capacity,
+        tuple(tile.mechanic_overlays),
     )
 
 

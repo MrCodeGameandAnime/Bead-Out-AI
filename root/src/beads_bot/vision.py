@@ -189,6 +189,85 @@ def _legality(attached_halo_score: float) -> tuple[str, float]:
     return "UNKNOWN", 0.48
 
 
+def _detect_tile_mechanic_overlays(
+    hsv_image: np.ndarray,
+    box: tuple[int, int, int, int],
+) -> tuple[str, ...]:
+    """Detect the diagonal key symbol inside one tile's local image region.
+
+    Key colors vary, so this looks for compact saturated-color components and
+    classifies their local silhouette. Restricting the crop to a padded tile
+    box avoids attaching nearby tray/UI graphics to the tile. The diagonal
+    ring-and-shaft silhouette distinguishes the observed keys from the nearby
+    vertically/horizontally oriented padlocks.
+    """
+    left, top, right, bottom = box
+    cell_width, cell_height = right - left, bottom - top
+    pad_x, pad_y = max(3, round(cell_width * 0.04)), max(3, round(cell_height * 0.04))
+    x0, y0 = max(0, left - pad_x), max(0, top - pad_y)
+    x1, y1 = min(hsv_image.shape[1], right + pad_x), min(hsv_image.shape[0], bottom + pad_y)
+    if x1 <= x0 or y1 <= y0:
+        return ()
+
+    hsv = hsv_image[y0:y1, x0:x1]
+    hue, saturation, value = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+    vivid = (saturation >= 110) & (value >= 90)
+    if int(vivid.sum()) < 80:
+        return ()
+
+    # Select local hue modes. Eight-unit bins tolerate compression and
+    # brightness shifts; circular separation keeps red and orange distinct.
+    histogram = np.bincount((hue[vivid] // 8).astype(np.int16), minlength=32)
+    hue_modes: list[int] = []
+    for bin_index in np.argsort(histogram)[::-1]:
+        if histogram[bin_index] < max(24, int(vivid.sum() * 0.012)):
+            break
+        separated = all(
+            min((int(bin_index) - prior) % 32, (prior - int(bin_index)) % 32) > 1
+            for prior in hue_modes
+        )
+        if separated:
+            hue_modes.append(int(bin_index))
+
+    tile_area = max(1, cell_width * cell_height)
+    for hue_bin in hue_modes:
+        mode_hue = hue_bin * 8 + 4
+        hue_values = hue.astype(np.int16)
+        hue_distance = np.minimum(
+            (hue_values - mode_hue) % 256,
+            (mode_hue - hue_values) % 256,
+        )
+        mask = (hue_distance <= 11) & vivid
+        for comp_left, comp_top, comp_right, comp_bottom, area in _components(mask):
+            comp_width = comp_right - comp_left
+            comp_height = comp_bottom - comp_top
+            area_ratio = area / tile_area
+            width_ratio = comp_width / max(cell_width, 1)
+            height_ratio = comp_height / max(cell_height, 1)
+            if not (
+                0.08 <= area_ratio <= 0.36
+                and 0.55 <= width_ratio <= 0.98
+                and 0.38 <= height_ratio <= 0.78
+                and comp_width / max(comp_height, 1) >= 1.08
+            ):
+                continue
+
+            component = mask[comp_top:comp_bottom, comp_left:comp_right]
+            ys, xs = np.nonzero(component)
+            if len(xs) < 40:
+                continue
+            points = np.column_stack((xs, ys)).astype(np.float64)
+            covariance = np.cov(points, rowvar=False)
+            eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+            major = int(np.argmax(eigenvalues))
+            elongation = float(eigenvalues[major] / max(eigenvalues[1 - major], 1e-6))
+            vector = eigenvectors[:, major]
+            angle = float(np.degrees(np.arctan2(vector[1], vector[0])) % 180.0)
+            if elongation >= 3.0 and 120.0 <= angle <= 178.0:
+                return ("key",)
+    return ()
+
+
 def _find_tiles(rgb: np.ndarray, hsv: np.ndarray) -> tuple[tuple[Tile, ...], tuple[LockMarker, ...]]:
     height, width = hsv.shape[:2]
     rx0, ry0, rx1, ry1 = TILE_SEARCH_REGION
@@ -220,6 +299,7 @@ def _find_tiles(rgb: np.ndarray, hsv: np.ndarray) -> tuple[tuple[Tile, ...], tup
         color, color_confidence, kind = _tile_color(hsv, box)
         relief_score = _attached_halo_score(rgb, box)
         legality, relief_confidence = _legality(relief_score)
+        mechanic_overlays = _detect_tile_mechanic_overlays(hsv, box)
         if kind == "hidden":
             legality = "DNH" if legality == "UNKNOWN" else legality
         tiles.append(
@@ -232,6 +312,7 @@ def _find_tiles(rgb: np.ndarray, hsv: np.ndarray) -> tuple[tuple[Tile, ...], tup
                 color_confidence=round(color_confidence, 3),
                 kind="special" if has_special_value else kind,
                 number=None,
+                mechanic_overlays=mechanic_overlays,
             )
         )
     return tuple(tiles), lock_markers

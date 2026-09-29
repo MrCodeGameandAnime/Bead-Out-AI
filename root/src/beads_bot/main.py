@@ -53,6 +53,7 @@ def _state_dict(state: GameState, decision: Decision, times: dict[str, float]) -
                 "confidence": tile.confidence,
                 "color_confidence": tile.color_confidence,
                 "locked": tile.locked,
+                "mechanic_overlays": tile.mechanic_overlays,
                 "lock_marker_ids": [
                     lock.id for lock in state.locks if _boxes_overlap(tile.bbox, lock.bbox)
                 ],
@@ -103,7 +104,16 @@ def _state_signature(state: GameState) -> tuple:
         state.feed.upcoming,
         state.progress,
         tuple(
-            (tile.id, tile.bbox, tile.color, tile.legality, tile.kind, tile.locked, tile.number)
+            (
+                tile.id,
+                tile.bbox,
+                tile.color,
+                tile.legality,
+                tile.kind,
+                tile.locked,
+                tile.number,
+                tuple(tile.mechanic_overlays),
+            )
             for tile in state.tiles
         ),
         tuple((lock.id, lock.center, lock.bbox) for lock in state.locks),

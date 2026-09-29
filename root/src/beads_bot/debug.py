@@ -43,8 +43,11 @@ def save_debug_image(
         short_id = tile.id.rsplit("-", 1)[-1]
         rank = candidate_ranks.get(tile.id)
         rank_label = f"#{rank} " if rank is not None else ""
-        text = f"{rank_label}{short_id} {tile.legality} value unknown" if tile.kind == "special" and tile.number is None else (
-            f"{rank_label}{short_id} {tile.color or tile.kind} {tile.legality}"
+        overlay_label = f" +{'/'.join(tile.mechanic_overlays)}" if tile.mechanic_overlays else ""
+        text = (
+            f"{rank_label}{short_id} {tile.legality} value unknown{overlay_label}"
+            if tile.kind == "special" and tile.number is None
+            else f"{rank_label}{short_id} {tile.color or tile.kind} {tile.legality}{overlay_label}"
         )
         label_top = max(0, top - 15)
         # Repaint the old label strip and its few pixels of overlap into the

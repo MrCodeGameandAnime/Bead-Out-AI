@@ -69,6 +69,7 @@ class Tile:
     capacity: int | None = None
     locked: bool = False
     number: int | None = None
+    mechanic_overlays: tuple[str, ...] = ()
 
     @property
     def center(self) -> tuple[int, int]:

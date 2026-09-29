@@ -12,7 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = ROOT / "img"
 
 
-def _tile(tile_id, y, *, color="green", legality="RH", kind="tile", locked=False):
+def _tile(tile_id, y, *, color="green", legality="RH", kind="tile", locked=False,
+          mechanic_overlays=()):
     return Tile(
         id=tile_id,
         bbox=(20, y, 80, y + 60),
@@ -22,6 +23,7 @@ def _tile(tile_id, y, *, color="green", legality="RH", kind="tile", locked=False
         color_confidence=0.9 if color else 0.4,
         kind=kind,
         locked=locked,
+        mechanic_overlays=mechanic_overlays,
     )
 
 
@@ -38,6 +40,57 @@ def _state(tiles, *, feed=None, locks=()):
 
 
 class PolicySampleTests(unittest.TestCase):
+    def test_key_overlay_is_explicit_in_context_and_adds_uncertainty(self):
+        ordinary = _tile("ordinary", 100, color="orange")
+        key = _tile("key", 100, color="orange", mechanic_overlays=("key",))
+        state = _state([ordinary, key])
+
+        candidates = policy_module.rank_candidates(state)
+        by_id = {candidate.tile.id: candidate for candidate in candidates}
+        key_candidate = by_id["key"]
+        ordinary_candidate = by_id["ordinary"]
+        key_mechanics = next(item for item in key_candidate.requirements if item.name == "other_mechanics")
+        ordinary_mechanics = next(item for item in ordinary_candidate.requirements if item.name == "other_mechanics")
+
+        self.assertEqual(key_candidate.context.features["mechanic_overlay"], "key")
+        self.assertEqual(key_candidate.context.features["mechanic_overlays"], ("key",))
+        self.assertEqual(key_candidate.context.features["mechanic_overlay_status"], "KNOWN")
+        self.assertEqual(key_candidate.context.features["mechanic_rule_status"], "UNKNOWN")
+        self.assertEqual(key_mechanics.status, "UNCERTAIN")
+        self.assertIn("key overlay", key_mechanics.source)
+        self.assertEqual(ordinary_candidate.context.features["mechanic_overlay"], None)
+        self.assertEqual(ordinary_mechanics.status, "KNOWN")
+        self.assertEqual(candidates[0].tile.id, "ordinary")
+        self.assertIn(key_candidate, candidates)
+
+    def test_only_plausible_key_candidate_remains_executable(self):
+        key = _tile("only-key", 100, mechanic_overlays=("key",))
+
+        decision = choose_move(_state([key]))
+
+        self.assertEqual(decision.tile, key)
+        self.assertTrue(decision.candidates)
+
+    def test_key_overlay_change_reenables_suppressed_physical_tile_after_jitter(self):
+        key = _tile("key", 100, mechanic_overlays=("key",))
+        attempted = policy_module.rank_candidates(_state([key]))[0]
+        jittered_same_key = Tile(
+            id="fresh-id", bbox=(23, 97, 83, 157), color=key.color,
+            legality=key.legality, confidence=key.confidence,
+            color_confidence=key.color_confidence, kind=key.kind,
+            mechanic_overlays=("key",),
+        )
+        removed_key = Tile(
+            id="another-id", bbox=(23, 97, 83, 157), color=key.color,
+            legality=key.legality, confidence=key.confidence,
+            color_confidence=key.color_confidence, kind=key.kind,
+        )
+
+        self.assertEqual(policy_module.rank_candidates(_state([jittered_same_key]), attempted=(attempted,)), ())
+        reenabled = policy_module.rank_candidates(_state([removed_key]), attempted=(attempted,))
+        self.assertEqual(len(reenabled), 1)
+        self.assertEqual(reenabled[0].tile.mechanic_overlays, ())
+
     def test_attempted_candidate_identity_survives_tiny_bbox_jitter_and_new_tile_ids(self):
         original_tile = _tile("tile-1", 120)
         original_state = _state([original_tile])
@@ -248,6 +301,19 @@ class PolicySampleTests(unittest.TestCase):
         self.assertEqual(report["outcomes"], {"interaction": "NOT_ATTEMPTED", "strategic": "UNKNOWN"})
         self.assertEqual(report["feed"]["current"], "green")
         self.assertEqual(report["execution"], "offline: no input sent")
+
+    def test_offline_report_serializes_key_overlay_in_tile_and_candidate_context(self):
+        report = run_offline(SAMPLES / "level80_feed_before_action_01.jpg", None)
+
+        keyed_tiles = [tile for tile in report["tiles"] if "key" in tile["mechanic_overlays"]]
+        keyed_candidates = [
+            candidate for candidate in report["candidates"]
+            if candidate["context"]["features"].get("mechanic_overlay") == "key"
+        ]
+        self.assertEqual(len(keyed_tiles), 3)
+        self.assertTrue(keyed_candidates)
+        self.assertTrue(all(item["context"]["features"]["mechanic_rule_status"] == "UNKNOWN"
+                            for item in keyed_candidates))
 
 
 if __name__ == "__main__":

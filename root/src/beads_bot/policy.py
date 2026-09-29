@@ -150,8 +150,17 @@ def _requirements(state: GameState, tile: Tile) -> tuple[RequirementEvidence, ..
         screen_status = "UNKNOWN"
         screen_confidence = 0.0
 
-    other_status: EvidenceStatus = "KNOWN" if tile.kind in ("tile", "special") else "UNCERTAIN"
-    other_source = "no additional tile mechanic observed" if other_status == "KNOWN" else f"tile kind is {tile.kind}"
+    if tile.mechanic_overlays:
+        other_status: EvidenceStatus = "UNCERTAIN"
+        overlays = ", ".join(tile.mechanic_overlays)
+        other_source = f"visible {overlays} overlay; behavior unresolved"
+    else:
+        other_status = "KNOWN" if tile.kind in ("tile", "special") else "UNCERTAIN"
+        other_source = (
+            "no additional tile mechanic observed"
+            if other_status == "KNOWN"
+            else f"tile kind is {tile.kind}"
+        )
     return (
         _status("tile_legality", legality_status, tile.confidence, f"relief classifier: {tile.legality}"),
         _status("tile_color", color_status, tile.color_confidence, f"tile color: {tile.color or 'unknown'}"),
@@ -207,6 +216,10 @@ def _context(state: GameState, tile: Tile) -> EvidenceContext:
             "tile_color": tile.color,
             "tile_kind": tile.kind,
             "tile_legality": tile.legality,
+            "mechanic_overlay": tile.mechanic_overlays[0] if len(tile.mechanic_overlays) == 1 else None,
+            "mechanic_overlays": tile.mechanic_overlays,
+            "mechanic_overlay_status": "KNOWN" if tile.mechanic_overlays else "NONE",
+            "mechanic_rule_status": "UNKNOWN" if tile.mechanic_overlays else "KNOWN",
             "tile_locked": tile.locked,
             "lock_overlap": locked,
             "feed_current": state.feed.current,
