@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -54,6 +55,26 @@ def _adb_command(adb: str, arguments: list[str], serial: str | None, timeout: fl
         detail = result.stderr.decode(errors="replace").strip()
         raise RuntimeError(f"ADB command failed ({result.returncode}): {detail or command}")
     return result.stdout
+
+
+def parse_input_size(output: str) -> tuple[int, int] | None:
+    """Parse Android ``wm size`` output, preferring its active override."""
+    matches = re.findall(r"(?:Physical|Override) size:\s*(\d+)\s*x\s*(\d+)", output, flags=re.IGNORECASE)
+    if not matches:
+        return None
+    width, height = (int(value) for value in matches[-1])
+    return (width, height) if width > 0 and height > 0 else None
+
+
+def device_input_size(
+    adb_path: str | Path | None = None,
+    serial: str | None = None,
+    timeout: float = 4.0,
+) -> tuple[int, int] | None:
+    """Read the effective Android input dimensions without sending input."""
+    adb = resolve_adb(adb_path)
+    output = _adb_command(adb, ["shell", "wm", "size"], serial, timeout).decode(errors="replace")
+    return parse_input_size(output)
 
 
 def capture_frame(

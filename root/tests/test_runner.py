@@ -6,7 +6,7 @@ import unittest
 
 from PIL import Image
 
-from beads_bot.board import FeedObservation, GameState, ScreenControl, Tile
+from beads_bot.board import FeedObservation, GameState, ProtectedState, ScreenControl, Tile
 from beads_bot.capture import CapturedFrame
 from beads_bot import main as main_module
 
@@ -15,7 +15,7 @@ def _tile(tile_id, y, *, color="green", legality="RH", confidence=0.9):
     return Tile(tile_id, (20, y, 80, y + 60), color, legality, confidence, 0.9)
 
 
-def _state(tiles=(), *, screen="game", controls=(), modal_substate=None, feed=None):
+def _state(tiles=(), *, screen="game", controls=(), modal_substate=None, feed=None, protected_state=None):
     tiles = tuple(tiles)
     board = None if not tiles else (
         min(tile.bbox[0] for tile in tiles),
@@ -32,6 +32,7 @@ def _state(tiles=(), *, screen="game", controls=(), modal_substate=None, feed=No
         feed=feed or FeedObservation(None, (), 0.0, "unresolved"),
         controls=tuple(controls),
         modal_substate=modal_substate,
+        protected_state=protected_state or ProtectedState(),
     )
 
 
@@ -42,15 +43,23 @@ class ContinuousRunnerTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def _run(self, states, *, max_moves=1, execute=True):
+    def _run(self, states, *, max_moves=1, execute=True, fresh_states=None, input_size=(240, 500)):
         states = list(states)
+        fresh_states = None if fresh_states is None else list(fresh_states)
         images = []
         state_by_pixel = {}
+        fresh_images = []
         for index, state in enumerate(states, start=1):
             pixel = (index, 0, 0)
             state_by_pixel[pixel] = state
-            images.append(Image.new("RGB", (1, 1), pixel))
+            images.append(Image.new("RGB", (state.width, state.height), pixel))
+        if fresh_states is not None:
+            for index, state in enumerate(fresh_states, start=101):
+                pixel = (index % 255, index // 255, 1)
+                state_by_pixel[pixel] = state
+                fresh_images.append(Image.new("RGB", (state.width, state.height), pixel))
         cursor = 0
+        fresh_cursor = 0
         taps = []
 
         def capture_fn(_adb=None, _serial=None):
@@ -58,6 +67,15 @@ class ContinuousRunnerTests(unittest.TestCase):
             index = min(cursor, len(images) - 1)
             cursor += 1
             return CapturedFrame(images[index], 1.0)
+
+        def revalidation_capture_fn(_adb=None, _serial=None):
+            nonlocal fresh_cursor
+            if fresh_images:
+                index = min(fresh_cursor, len(fresh_images) - 1)
+                fresh_cursor += 1
+                return CapturedFrame(fresh_images[index], 0.5)
+            index = min(max(0, cursor - 1), len(images) - 1)
+            return CapturedFrame(images[index], 0.5)
 
         def analyze_fn(image):
             return state_by_pixel[image.getpixel((0, 0))]
@@ -80,6 +98,8 @@ class ContinuousRunnerTests(unittest.TestCase):
             capture_fn=capture_fn,
             tap_fn=tap_fn,
             analyze_fn=analyze_fn,
+            input_size_fn=lambda _adb=None, _serial=None: input_size,
+            revalidation_capture_fn=revalidation_capture_fn,
             sleep_fn=lambda _seconds: None,
         )
         return result, taps, cursor
@@ -458,7 +478,7 @@ class ContinuousRunnerTests(unittest.TestCase):
         for index, state in enumerate(states, start=1):
             pixel = (index, 0, 0)
             state_by_pixel[pixel] = state
-            images.append(Image.new("RGB", (1, 1), pixel))
+            images.append(Image.new("RGB", (state.width, state.height), pixel))
         cursor = 0
         taps = []
         debug_dir = Path(self.temp.name) / "recovery"
@@ -469,18 +489,19 @@ class ContinuousRunnerTests(unittest.TestCase):
             cursor += 1
             return CapturedFrame(images[index], 1.0)
 
+        def revalidation_capture_fn(_adb=None, _serial=None):
+            index = min(max(0, cursor - 1), len(images) - 1)
+            return CapturedFrame(images[index], 0.5)
+
         def tap_fn(x, y, _adb=None, _serial=None):
             taps.append((x, y))
             if (x, y) == (92, 92):
-                manifests = list((debug_dir / "runs").glob("*/manifest.json"))
-                self.assertEqual(len(manifests), 1)
-                failure_manifest = json.loads(manifests[0].read_text(encoding="utf-8"))
-                self.assertEqual(failure_manifest["status"], "failure")
-                records = [
-                    json.loads(line)
-                    for line in (debug_dir / "mechanic_evidence.jsonl").read_text(encoding="utf-8").splitlines()
+                event_files = list((debug_dir / "runs").glob("*/events.jsonl"))
+                self.assertEqual(len(event_files), 1)
+                events_before_navigation = [
+                    json.loads(line) for line in event_files[0].read_text(encoding="utf-8").splitlines()
                 ]
-                self.assertIn("LEVEL_FAILURE", [record.get("strategic_outcome") for record in records])
+                self.assertIn("LEVEL_FAILURE", [event["outcomes"]["strategic"] for event in events_before_navigation])
             return 0.5
 
         args = argparse.Namespace(
@@ -497,6 +518,8 @@ class ContinuousRunnerTests(unittest.TestCase):
             capture_fn=capture_fn,
             tap_fn=tap_fn,
             analyze_fn=lambda image: state_by_pixel[image.getpixel((0, 0))],
+            input_size_fn=lambda _adb=None, _serial=None: (240, 500),
+            revalidation_capture_fn=revalidation_capture_fn,
             sleep_fn=lambda _seconds: None,
         )
 
@@ -541,7 +564,7 @@ class ContinuousRunnerTests(unittest.TestCase):
 
     def test_capture_failure_after_tap_counts_the_accepted_input_attempt(self):
         game = _state([_tile("first", 20)])
-        images = [Image.new("RGB", (1, 1), (1, 0, 0))]
+        images = [Image.new("RGB", (game.width, game.height), (1, 0, 0))]
         capture_count = 0
         tap_calls = []
 
@@ -570,6 +593,8 @@ class ContinuousRunnerTests(unittest.TestCase):
             capture_fn=capture_fn,
             tap_fn=tap_fn,
             analyze_fn=lambda _image: game,
+            input_size_fn=lambda _adb=None, _serial=None: (240, 500),
+            revalidation_capture_fn=lambda _adb=None, _serial=None: CapturedFrame(images[0], 0.5),
             sleep_fn=lambda _seconds: None,
         )
 
@@ -621,6 +646,89 @@ class ContinuousRunnerTests(unittest.TestCase):
         self.assertEqual(taps[1], (50, 50))
         self.assertEqual(captures, 5)
         self.assertEqual(result["action_count"], 1)
+
+    def test_jit_revalidation_uses_fresh_tile_center_and_journals_sent_coordinate(self):
+        planned = _state([_tile("old-id", 20)])
+        fresh_tile = Tile("new-id", (24, 23, 84, 83), "green", "RH", 0.9, 0.9)
+        fresh = _state([fresh_tile])
+        after = _state([])
+
+        result, taps, _ = self._run([planned, after], fresh_states=[fresh], max_moves=1)
+        event = json.loads(Path(result["events_path"]).read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(taps, [(54, 53)])
+        self.assertEqual(event["execution"]["planned_coordinate"], [50, 50])
+        self.assertEqual(event["execution"]["revalidated_capture_coordinate"], [54, 53])
+        self.assertEqual(event["execution"]["outgoing_coordinate"], [54, 53])
+        self.assertEqual(event["execution"]["actual_coordinate_sent_to_adb"], [54, 53])
+        self.assertEqual((event["execution"]["capture_width"], event["execution"]["capture_height"]), (240, 500))
+        self.assertEqual((event["execution"]["device_input_width"], event["execution"]["device_input_height"]), (240, 500))
+        self.assertEqual(event["execution"]["coordinate_transform"], "identity")
+        self.assertEqual(event["execution"]["executor_decision"], "ALLOWED")
+
+    def test_jit_disappearance_or_modal_aborts_tile_action_without_tapping_old_point(self):
+        planned = _state([_tile("stale", 20)])
+        disappeared = _state([])
+        result, taps, _ = self._run([planned], fresh_states=[disappeared], max_moves=None)
+
+        self.assertEqual(taps, [])
+        self.assertEqual(result["status"], "no_progress")
+        events = [json.loads(line) for line in Path(result["events_path"]).read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(events[0]["execution"]["executor_decision"], "ABORTED")
+        self.assertEqual(events[0]["execution"]["actual_coordinate_sent_to_adb"], None)
+
+        modal = _state(screen="unknown")
+        result, taps, _ = self._run([planned], fresh_states=[modal], max_moves=None)
+        self.assertEqual(taps, [])
+        self.assertEqual(result["status"], "no_progress")
+
+    def test_coordinate_space_mismatch_blocks_runner_input(self):
+        game = _state([_tile("first", 20)])
+        result, taps, _ = self._run([game], input_size=(2400, 500))
+
+        self.assertEqual(taps, [])
+        self.assertEqual(result["status"], "safety_violation")
+        self.assertIn("coordinate_space_mismatch", result["reason"])
+
+    def test_bottom_booster_control_strip_cannot_be_a_board_tap_target(self):
+        game = _state([_tile("misdetected-booster", 435)])
+        result, taps, _ = self._run([game], max_moves=None)
+
+        self.assertEqual(taps, [])
+        self.assertEqual(result["status"], "safety_violation")
+        self.assertIn("protected_control_target", result["reason"])
+
+    def test_coin_spend_overrides_local_acceptance_and_hard_stops_runner(self):
+        before_protected = ProtectedState(2645, "KNOWN", "AVAILABLE", 4, "KNOWN")
+        after_protected = ProtectedState(1745, "KNOWN", "CONSUMED", 5, "KNOWN")
+        before_tile = Tile("key-tile", (20, 20, 80, 80), "cyan", "RH", 0.9, 0.9, mechanic_overlays=("key",))
+        after_tile = Tile("key-tile-new", (20, 20, 80, 80), "cyan", "RH", 0.9, 0.9)
+        before = _state([before_tile], protected_state=before_protected)
+        after = _state([after_tile, _tile("unrelated", 120)], protected_state=after_protected)
+        result, taps, _ = self._run([before, after, after], max_moves=None)
+        event = json.loads(Path(result["events_path"]).read_text(encoding="utf-8").splitlines()[0])
+
+        self.assertEqual(len(taps), 1)
+        self.assertEqual(result["status"], "safety_violation")
+        self.assertIn("unexpected_currency_decrease", result["reason"])
+        self.assertEqual(event["outcomes"]["interaction"], "SAFETY_VIOLATION")
+        self.assertEqual(event["outcomes"]["interaction_reason"], "unexpected_currency_decrease")
+        self.assertIn("unexpected_booster_consumption", event["outcomes"]["safety_violations"])
+        self.assertIn("unexpected_holder_capacity_change", event["outcomes"]["safety_violations"])
+        self.assertEqual(event["execution"]["actual_coordinate_sent_to_adb"], list(taps[0]))
+        self.assertEqual(event["execution"]["pre_action_protected_state"]["coin_balance"], 2645)
+        self.assertEqual(event["execution"]["post_action_protected_state"]["coin_balance"], 1745)
+
+    def test_coin_gain_and_normal_board_change_do_not_stop_runner(self):
+        protected = ProtectedState(845, "KNOWN", "AVAILABLE", 4, "KNOWN")
+        gained = ProtectedState(1745, "KNOWN", "AVAILABLE", 4, "KNOWN")
+        before = _state([_tile("first", 20)], protected_state=protected)
+        after = _state([], protected_state=gained)
+
+        result, taps, _ = self._run([before, after], max_moves=1)
+
+        self.assertEqual(taps, [(50, 50)])
+        self.assertEqual(result["status"], "move_limit")
 
 
 if __name__ == "__main__":

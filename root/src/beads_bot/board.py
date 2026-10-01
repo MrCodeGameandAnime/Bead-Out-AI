@@ -22,6 +22,7 @@ class InteractionOutcome(str, Enum):
     NO_CHANGE = "NO_CHANGE"
     NOT_ATTEMPTED = "NOT_ATTEMPTED"
     UNKNOWN = "UNKNOWN"
+    SAFETY_VIOLATION = "SAFETY_VIOLATION"
 
 
 class StrategicOutcome(str, Enum):
@@ -39,6 +40,17 @@ class ScreenControl:
     confidence: float
     cost: int | None = None
     requires_ad: bool = False
+
+
+@dataclass(frozen=True)
+class ProtectedState:
+    """Conservative observations of UI state that must not change from board taps."""
+
+    coin_balance: int | None = None
+    coin_status: str = "UNKNOWN"
+    extra_holder_booster: str = "UNKNOWN"
+    holder_capacity: int | None = None
+    holder_capacity_status: str = "UNKNOWN"
 
 
 @dataclass(frozen=True)
@@ -99,3 +111,4 @@ class GameState:
     progress: float | None = None
     controls: tuple[ScreenControl, ...] = ()
     modal_substate: str | None = None
+    protected_state: ProtectedState = ProtectedState()

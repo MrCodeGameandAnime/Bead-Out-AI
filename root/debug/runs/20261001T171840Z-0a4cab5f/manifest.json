@@ -1,0 +1,4276 @@
+{
+  "schema_version": 2,
+  "acceptance_model_version": "tile-local-v2",
+  "run_id": "20261001T171840Z-0a4cab5f",
+  "status": "failure",
+  "reason": "confirmed Level Failed screen",
+  "possible_failure_example": true,
+  "step_count": 25,
+  "events_path": "events.jsonl",
+  "recent_steps": [
+    {
+      "schema_version": 2,
+      "acceptance_model_version": "tile-local-v2",
+      "run_id": "20261001T171840Z-0a4cab5f",
+      "step_id": "step-000018",
+      "before_state": {
+        "screen": "game",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [
+          {
+            "id": "tile-01",
+            "bbox": [
+              481,
+              1396,
+              599,
+              1529
+            ],
+            "color": "purple",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.667,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1462
+            ]
+          },
+          {
+            "id": "tile-02",
+            "bbox": [
+              745,
+              1406,
+              863,
+              1529
+            ],
+            "color": "blue",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.97,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              804,
+              1467
+            ]
+          },
+          {
+            "id": "tile-03",
+            "bbox": [
+              613,
+              1531,
+              731,
+              1677
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.951,
+            "color_confidence": 0.97,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              672,
+              1604
+            ]
+          },
+          {
+            "id": "tile-04",
+            "bbox": [
+              745,
+              1565,
+              865,
+              1681
+            ],
+            "color": null,
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.0,
+            "kind": "hidden",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              805,
+              1623
+            ]
+          },
+          {
+            "id": "tile-05",
+            "bbox": [
+              349,
+              1679,
+              467,
+              1824
+            ],
+            "color": "cyan",
+            "legality": "RH",
+            "confidence": 0.928,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              408,
+              1751
+            ]
+          },
+          {
+            "id": "tile-06",
+            "bbox": [
+              481,
+              1690,
+              599,
+              1824
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1757
+            ]
+          },
+          {
+            "id": "tile-07",
+            "bbox": [
+              745,
+              1712,
+              866,
+              1828
+            ],
+            "color": null,
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.0,
+            "kind": "hidden",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              805,
+              1770
+            ]
+          },
+          {
+            "id": "tile-08",
+            "bbox": [
+              349,
+              1860,
+              467,
+              1971
+            ],
+            "color": "red",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.889,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1915
+            ]
+          },
+          {
+            "id": "tile-09",
+            "bbox": [
+              613,
+              1804,
+              731,
+              1971
+            ],
+            "color": "green",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.667,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1887
+            ]
+          },
+          {
+            "id": "tile-10",
+            "bbox": [
+              745,
+              1860,
+              863,
+              1971
+            ],
+            "color": "indigo",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.75,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              804,
+              1915
+            ]
+          }
+        ],
+        "board_region": [
+          349,
+          1396,
+          866,
+          1971
+        ],
+        "feed": {
+          "current": "cyan",
+          "upcoming": [
+            "white",
+            "cyan",
+            "blue",
+            null
+          ],
+          "confidence": 0.934,
+          "source": "visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left",
+          "direction": "from_left_toward_outlet",
+          "direction_confidence": 0.7,
+          "current_status": "direct",
+          "upcoming_status": "direct",
+          "outlet_status": "direct",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [
+          {
+            "id": "lock-01",
+            "bbox": [
+              694,
+              1528,
+              782,
+              1633
+            ],
+            "center": [
+              738,
+              1574
+            ],
+            "confidence": 0.791
+          }
+        ],
+        "warnings": [],
+        "progress": null,
+        "controls": [],
+        "modal_substate": null
+      },
+      "candidates": [
+        {
+          "key": "tile@09,18",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "cyan",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": "key",
+              "mechanic_overlays": [
+                "key"
+              ],
+              "mechanic_overlay_status": "KNOWN",
+              "mechanic_rule_status": "UNKNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "cyan",
+              "feed_upcoming": [
+                "white",
+                "cyan",
+                "blue",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.7,
+              "feed_class": "known",
+              "feed_match": "current",
+              "feed_match_offset": 0,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  [
+                    "key"
+                  ]
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "cyan",
+                  "upcoming": [
+                    "white",
+                    "cyan",
+                    "blue"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.114,
+                "y": 0.617,
+                "aspect_ratio": 0.814
+              },
+              "neighbors": [
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": "red",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-05",
+            "bbox": [
+              349,
+              1679,
+              467,
+              1824
+            ],
+            "color": "cyan",
+            "legality": "RH",
+            "confidence": 0.928,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              408,
+              1751
+            ]
+          },
+          "score": 1.0,
+          "confidence": 0.864,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.928,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "KNOWN",
+              "confidence": 0.833,
+              "source": "tile color: cyan"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "KNOWN",
+              "confidence": 0.934,
+              "source": "visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; color matches"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible key overlay; behavior unresolved"
+            }
+          ],
+          "assumptions": [
+            "other_mechanics=UNCERTAIN: visible key overlay; behavior unresolved"
+          ]
+        },
+        {
+          "key": "tile@12,18",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "orange",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": null,
+              "mechanic_overlays": [],
+              "mechanic_overlay_status": "NONE",
+              "mechanic_rule_status": "KNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "cyan",
+              "feed_upcoming": [
+                "white",
+                "cyan",
+                "blue",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.7,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  []
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "cyan",
+                  "upcoming": [
+                    "white",
+                    "cyan",
+                    "blue"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.369,
+                "y": 0.628,
+                "aspect_ratio": 0.881
+              },
+              "neighbors": [
+                {
+                  "color": "cyan",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": "green",
+                  "kind": "special",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": true
+                },
+                {
+                  "color": "red",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-06",
+            "bbox": [
+              481,
+              1690,
+              599,
+              1824
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1757
+            ]
+          },
+          "score": 0.883,
+          "confidence": 0.882,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.99,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "KNOWN",
+              "confidence": 0.833,
+              "source": "tile color: orange"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no additional tile mechanic observed"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+          ]
+        },
+        {
+          "key": "tile@12,15",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "purple",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": null,
+              "mechanic_overlays": [],
+              "mechanic_overlay_status": "NONE",
+              "mechanic_rule_status": "KNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "cyan",
+              "feed_upcoming": [
+                "white",
+                "cyan",
+                "blue",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.7,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  []
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "cyan",
+                  "upcoming": [
+                    "white",
+                    "cyan",
+                    "blue"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.369,
+                "y": 0.115,
+                "aspect_ratio": 0.887
+              },
+              "neighbors": [
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": true
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-01",
+            "bbox": [
+              481,
+              1396,
+              599,
+              1529
+            ],
+            "color": "purple",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.667,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1462
+            ]
+          },
+          "score": 0.8326,
+          "confidence": 0.858,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.99,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "LIKELY",
+              "confidence": 0.667,
+              "source": "tile color: purple"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no additional tile mechanic observed"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+          ]
+        },
+        {
+          "key": "tile@16,17",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "orange",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": "key",
+              "mechanic_overlays": [
+                "key"
+              ],
+              "mechanic_overlay_status": "KNOWN",
+              "mechanic_rule_status": "UNKNOWN",
+              "tile_locked": false,
+              "lock_overlap": true,
+              "feed_current": "cyan",
+              "feed_upcoming": [
+                "white",
+                "cyan",
+                "blue",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.7,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  [
+                    "key"
+                  ]
+                ],
+                "lock_overlap": true,
+                "feed": {
+                  "current": "cyan",
+                  "upcoming": [
+                    "white",
+                    "cyan",
+                    "blue"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.625,
+                "y": 0.362,
+                "aspect_ratio": 0.808
+              },
+              "neighbors": [
+                {
+                  "color": null,
+                  "kind": "hidden",
+                  "legality": "DNH",
+                  "locked": true
+                },
+                {
+                  "color": "blue",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": true
+                },
+                {
+                  "color": "purple",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": null,
+                  "kind": "hidden",
+                  "legality": "DNH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-03",
+            "bbox": [
+              613,
+              1531,
+              731,
+              1677
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.951,
+            "color_confidence": 0.97,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              672,
+              1604
+            ]
+          },
+          "score": 0.792,
+          "confidence": 0.739,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.951,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "KNOWN",
+              "confidence": 0.97,
+              "source": "tile color: orange"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "UNCERTAIN",
+              "confidence": 0.55,
+              "source": "overlapping lock marker"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible key overlay; behavior unresolved"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ",
+            "lock_rule=UNCERTAIN: overlapping lock marker",
+            "other_mechanics=UNCERTAIN: visible key overlay; behavior unresolved"
+          ]
+        }
+      ],
+      "chosen": {
+        "key": "tile@09,18",
+        "context": {
+          "mechanic_id": "tile-selection",
+          "features": {
+            "tile_color": "cyan",
+            "tile_kind": "tile",
+            "tile_legality": "RH",
+            "mechanic_overlay": "key",
+            "mechanic_overlays": [
+              "key"
+            ],
+            "mechanic_overlay_status": "KNOWN",
+            "mechanic_rule_status": "UNKNOWN",
+            "tile_locked": false,
+            "lock_overlap": false,
+            "feed_current": "cyan",
+            "feed_upcoming": [
+              "white",
+              "cyan",
+              "blue",
+              null
+            ],
+            "feed_direction": "from_left_toward_outlet",
+            "feed_direction_confidence": 0.7,
+            "feed_class": "known",
+            "feed_match": "current",
+            "feed_match_offset": 0,
+            "retry_context_version": "context-v1",
+            "retry_context": {
+              "tile_state": [
+                "RH",
+                "tile",
+                false,
+                null,
+                null,
+                null,
+                [
+                  "key"
+                ]
+              ],
+              "lock_overlap": false,
+              "feed": {
+                "current": "cyan",
+                "upcoming": [
+                  "white",
+                  "cyan",
+                  "blue"
+                ]
+              }
+            },
+            "local_geometry": {
+              "x": 0.114,
+              "y": 0.617,
+              "aspect_ratio": 0.814
+            },
+            "neighbors": [
+              {
+                "color": "orange",
+                "kind": "tile",
+                "legality": "RH",
+                "locked": false
+              },
+              {
+                "color": "red",
+                "kind": "tile",
+                "legality": "DNH",
+                "locked": false
+              }
+            ]
+          }
+        },
+        "tile": {
+          "id": "tile-05",
+          "bbox": [
+            349,
+            1679,
+            467,
+            1824
+          ],
+          "color": "cyan",
+          "legality": "RH",
+          "confidence": 0.928,
+          "color_confidence": 0.833,
+          "kind": "tile",
+          "occupancy": null,
+          "capacity": null,
+          "locked": false,
+          "number": null,
+          "mechanic_overlays": [
+            "key"
+          ],
+          "center": [
+            408,
+            1751
+          ]
+        },
+        "score": 1.0,
+        "confidence": 0.864,
+        "requirements": [
+          {
+            "name": "tile_legality",
+            "status": "KNOWN",
+            "confidence": 0.928,
+            "source": "relief classifier: RH"
+          },
+          {
+            "name": "tile_color",
+            "status": "KNOWN",
+            "confidence": 0.833,
+            "source": "tile color: cyan"
+          },
+          {
+            "name": "visible_current_state",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "screen: game"
+          },
+          {
+            "name": "feed_state",
+            "status": "KNOWN",
+            "confidence": 0.934,
+            "source": "visible outlet bead; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; color matches"
+          },
+          {
+            "name": "special_rule",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "ordinary tile"
+          },
+          {
+            "name": "lock_rule",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "no lock overlap detected"
+          },
+          {
+            "name": "other_mechanics",
+            "status": "UNCERTAIN",
+            "confidence": 0.35,
+            "source": "visible key overlay; behavior unresolved"
+          }
+        ],
+        "assumptions": [
+          "other_mechanics=UNCERTAIN: visible key overlay; behavior unresolved"
+        ]
+      },
+      "tap": [
+        408,
+        1751
+      ],
+      "after_state": {
+        "screen": "game",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [
+          {
+            "id": "tile-01",
+            "bbox": [
+              481,
+              1396,
+              599,
+              1529
+            ],
+            "color": "purple",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.667,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1462
+            ]
+          },
+          {
+            "id": "tile-02",
+            "bbox": [
+              613,
+              1382,
+              731,
+              1529
+            ],
+            "color": "white",
+            "legality": "DNH",
+            "confidence": 0.858,
+            "color_confidence": 0.72,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1455
+            ]
+          },
+          {
+            "id": "tile-03",
+            "bbox": [
+              745,
+              1367,
+              863,
+              1529
+            ],
+            "color": "blue",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.97,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              804,
+              1448
+            ]
+          },
+          {
+            "id": "tile-04",
+            "bbox": [
+              349,
+              1565,
+              467,
+              1681
+            ],
+            "color": "white",
+            "legality": "DNH",
+            "confidence": 0.801,
+            "color_confidence": 0.72,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1623
+            ]
+          },
+          {
+            "id": "tile-05",
+            "bbox": [
+              613,
+              1565,
+              731,
+              1681
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.932,
+            "color_confidence": 0.917,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1623
+            ]
+          },
+          {
+            "id": "tile-06",
+            "bbox": [
+              745,
+              1565,
+              865,
+              1681
+            ],
+            "color": null,
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.0,
+            "kind": "hidden",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              805,
+              1623
+            ]
+          },
+          {
+            "id": "tile-07",
+            "bbox": [
+              349,
+              1701,
+              467,
+              1826
+            ],
+            "color": "blue",
+            "legality": "RH",
+            "confidence": 0.96,
+            "color_confidence": 0.444,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1763
+            ]
+          },
+          {
+            "id": "tile-08",
+            "bbox": [
+              481,
+              1690,
+              599,
+              1824
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1757
+            ]
+          },
+          {
+            "id": "tile-09",
+            "bbox": [
+              745,
+              1712,
+              866,
+              1828
+            ],
+            "color": null,
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.0,
+            "kind": "hidden",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              805,
+              1770
+            ]
+          },
+          {
+            "id": "tile-10",
+            "bbox": [
+              349,
+              1860,
+              467,
+              1971
+            ],
+            "color": "red",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.889,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1915
+            ]
+          },
+          {
+            "id": "tile-11",
+            "bbox": [
+              613,
+              1804,
+              731,
+              1971
+            ],
+            "color": "green",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.667,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1887
+            ]
+          },
+          {
+            "id": "tile-12",
+            "bbox": [
+              745,
+              1860,
+              863,
+              1971
+            ],
+            "color": "indigo",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.75,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              804,
+              1915
+            ]
+          }
+        ],
+        "board_region": [
+          349,
+          1367,
+          866,
+          1971
+        ],
+        "feed": {
+          "current": "cyan",
+          "upcoming": [
+            "white",
+            "cyan",
+            "blue",
+            null
+          ],
+          "confidence": 0.467,
+          "source": "temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved",
+          "direction": "from_left_toward_outlet",
+          "direction_confidence": 0.35,
+          "current_status": "tracked",
+          "upcoming_status": "tracked",
+          "outlet_status": "tracked",
+          "age_frames": 1
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [],
+        "modal_substate": null
+      },
+      "outcomes": {
+        "interaction": "ACTION_ACCEPTED",
+        "interaction_reason": "chosen_overlay_changed",
+        "strategic": "IN_PROGRESS",
+        "local_effect_observed": true,
+        "local_effect_attribution": "ambiguous"
+      },
+      "timings_ms": {
+        "capture": 1222.93,
+        "policy": 302.03,
+        "tap": 216.84,
+        "verify_capture": 1229.98
+      },
+      "uncertain_assumptions": [
+        "other_mechanics=UNCERTAIN: visible key overlay; behavior unresolved"
+      ],
+      "frames": {
+        "before": "frames/step-000018-before.jpg",
+        "after": "frames/step-000018-after.jpg"
+      }
+    },
+    {
+      "schema_version": 2,
+      "acceptance_model_version": "tile-local-v2",
+      "run_id": "20261001T171840Z-0a4cab5f",
+      "step_id": "step-000019",
+      "before_state": {
+        "screen": "game",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [
+          {
+            "id": "tile-01",
+            "bbox": [
+              481,
+              1396,
+              599,
+              1529
+            ],
+            "color": "purple",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.667,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1462
+            ]
+          },
+          {
+            "id": "tile-02",
+            "bbox": [
+              613,
+              1382,
+              731,
+              1529
+            ],
+            "color": "white",
+            "legality": "DNH",
+            "confidence": 0.858,
+            "color_confidence": 0.72,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1455
+            ]
+          },
+          {
+            "id": "tile-03",
+            "bbox": [
+              745,
+              1367,
+              863,
+              1529
+            ],
+            "color": "blue",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.97,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              804,
+              1448
+            ]
+          },
+          {
+            "id": "tile-04",
+            "bbox": [
+              349,
+              1565,
+              467,
+              1681
+            ],
+            "color": "white",
+            "legality": "DNH",
+            "confidence": 0.801,
+            "color_confidence": 0.72,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1623
+            ]
+          },
+          {
+            "id": "tile-05",
+            "bbox": [
+              613,
+              1565,
+              731,
+              1681
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.932,
+            "color_confidence": 0.917,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1623
+            ]
+          },
+          {
+            "id": "tile-06",
+            "bbox": [
+              745,
+              1565,
+              865,
+              1681
+            ],
+            "color": null,
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.0,
+            "kind": "hidden",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              805,
+              1623
+            ]
+          },
+          {
+            "id": "tile-07",
+            "bbox": [
+              349,
+              1701,
+              467,
+              1826
+            ],
+            "color": "blue",
+            "legality": "RH",
+            "confidence": 0.96,
+            "color_confidence": 0.444,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1763
+            ]
+          },
+          {
+            "id": "tile-08",
+            "bbox": [
+              481,
+              1690,
+              599,
+              1824
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1757
+            ]
+          },
+          {
+            "id": "tile-09",
+            "bbox": [
+              745,
+              1712,
+              866,
+              1828
+            ],
+            "color": null,
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.0,
+            "kind": "hidden",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              805,
+              1770
+            ]
+          },
+          {
+            "id": "tile-10",
+            "bbox": [
+              349,
+              1860,
+              467,
+              1971
+            ],
+            "color": "red",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.889,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1915
+            ]
+          },
+          {
+            "id": "tile-11",
+            "bbox": [
+              613,
+              1804,
+              731,
+              1971
+            ],
+            "color": "green",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.667,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1887
+            ]
+          },
+          {
+            "id": "tile-12",
+            "bbox": [
+              745,
+              1860,
+              863,
+              1971
+            ],
+            "color": "indigo",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.75,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              804,
+              1915
+            ]
+          }
+        ],
+        "board_region": [
+          349,
+          1367,
+          866,
+          1971
+        ],
+        "feed": {
+          "current": "cyan",
+          "upcoming": [
+            "white",
+            "cyan",
+            "blue",
+            null
+          ],
+          "confidence": 0.467,
+          "source": "temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved",
+          "direction": "from_left_toward_outlet",
+          "direction_confidence": 0.35,
+          "current_status": "tracked",
+          "upcoming_status": "tracked",
+          "outlet_status": "tracked",
+          "age_frames": 1
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [],
+        "modal_substate": null
+      },
+      "candidates": [
+        {
+          "key": "tile@16,17",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "orange",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": null,
+              "mechanic_overlays": [],
+              "mechanic_overlay_status": "NONE",
+              "mechanic_rule_status": "KNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "cyan",
+              "feed_upcoming": [
+                "white",
+                "cyan",
+                "blue",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.35,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  []
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "cyan",
+                  "upcoming": [
+                    "white",
+                    "cyan",
+                    "blue"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.625,
+                "y": 0.424,
+                "aspect_ratio": 1.017
+              },
+              "neighbors": [
+                {
+                  "color": null,
+                  "kind": "hidden",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "white",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": null,
+                  "kind": "hidden",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "purple",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-05",
+            "bbox": [
+              613,
+              1565,
+              731,
+              1681
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.932,
+            "color_confidence": 0.917,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1623
+            ]
+          },
+          "score": 0.883,
+          "confidence": 0.902,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.932,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "KNOWN",
+              "confidence": 0.917,
+              "source": "tile color: orange"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.467,
+              "source": "temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no additional tile mechanic observed"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+          ]
+        },
+        {
+          "key": "tile@12,18",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "orange",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": null,
+              "mechanic_overlays": [],
+              "mechanic_overlay_status": "NONE",
+              "mechanic_rule_status": "KNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "cyan",
+              "feed_upcoming": [
+                "white",
+                "cyan",
+                "blue",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.35,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  []
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "cyan",
+                  "upcoming": [
+                    "white",
+                    "cyan",
+                    "blue"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.369,
+                "y": 0.646,
+                "aspect_ratio": 0.881
+              },
+              "neighbors": [
+                {
+                  "color": "blue",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": "green",
+                  "kind": "special",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "white",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": "red",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-08",
+            "bbox": [
+              481,
+              1690,
+              599,
+              1824
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1757
+            ]
+          },
+          "score": 0.883,
+          "confidence": 0.899,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.99,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "KNOWN",
+              "confidence": 0.833,
+              "source": "tile color: orange"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.467,
+              "source": "temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no additional tile mechanic observed"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+          ]
+        },
+        {
+          "key": "tile@12,15",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "purple",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": null,
+              "mechanic_overlays": [],
+              "mechanic_overlay_status": "NONE",
+              "mechanic_rule_status": "KNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "cyan",
+              "feed_upcoming": [
+                "white",
+                "cyan",
+                "blue",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.35,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  []
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "cyan",
+                  "upcoming": [
+                    "white",
+                    "cyan",
+                    "blue"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.369,
+                "y": 0.157,
+                "aspect_ratio": 0.887
+              },
+              "neighbors": [
+                {
+                  "color": "white",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "white",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-01",
+            "bbox": [
+              481,
+              1396,
+              599,
+              1529
+            ],
+            "color": "purple",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.667,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1462
+            ]
+          },
+          "score": 0.8326,
+          "confidence": 0.875,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.99,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "LIKELY",
+              "confidence": 0.667,
+              "source": "tile color: purple"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.467,
+              "source": "temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no additional tile mechanic observed"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+          ]
+        },
+        {
+          "key": "tile@09,18",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "blue",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": null,
+              "mechanic_overlays": [],
+              "mechanic_overlay_status": "NONE",
+              "mechanic_rule_status": "KNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "cyan",
+              "feed_upcoming": [
+                "white",
+                "cyan",
+                "blue",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.35,
+              "feed_class": "known",
+              "feed_match": "imminent",
+              "feed_match_offset": 3,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  []
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "cyan",
+                  "upcoming": [
+                    "white",
+                    "cyan",
+                    "blue"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.114,
+                "y": 0.656,
+                "aspect_ratio": 0.944
+              },
+              "neighbors": [
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": "white",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "red",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-07",
+            "bbox": [
+              349,
+              1701,
+              467,
+              1826
+            ],
+            "color": "blue",
+            "legality": "RH",
+            "confidence": 0.96,
+            "color_confidence": 0.444,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1763
+            ]
+          },
+          "score": 0.7688,
+          "confidence": 0.839,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.96,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "UNCERTAIN",
+              "confidence": 0.444,
+              "source": "tile color: blue"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.467,
+              "source": "temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no additional tile mechanic observed"
+            }
+          ],
+          "assumptions": [
+            "tile_color=UNCERTAIN: tile color: blue",
+            "feed_state=UNCERTAIN: temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+          ]
+        }
+      ],
+      "chosen": {
+        "key": "tile@16,17",
+        "context": {
+          "mechanic_id": "tile-selection",
+          "features": {
+            "tile_color": "orange",
+            "tile_kind": "tile",
+            "tile_legality": "RH",
+            "mechanic_overlay": null,
+            "mechanic_overlays": [],
+            "mechanic_overlay_status": "NONE",
+            "mechanic_rule_status": "KNOWN",
+            "tile_locked": false,
+            "lock_overlap": false,
+            "feed_current": "cyan",
+            "feed_upcoming": [
+              "white",
+              "cyan",
+              "blue",
+              null
+            ],
+            "feed_direction": "from_left_toward_outlet",
+            "feed_direction_confidence": 0.35,
+            "feed_class": "known",
+            "feed_match": "unmatched",
+            "feed_match_offset": null,
+            "retry_context_version": "context-v1",
+            "retry_context": {
+              "tile_state": [
+                "RH",
+                "tile",
+                false,
+                null,
+                null,
+                null,
+                []
+              ],
+              "lock_overlap": false,
+              "feed": {
+                "current": "cyan",
+                "upcoming": [
+                  "white",
+                  "cyan",
+                  "blue"
+                ]
+              }
+            },
+            "local_geometry": {
+              "x": 0.625,
+              "y": 0.424,
+              "aspect_ratio": 1.017
+            },
+            "neighbors": [
+              {
+                "color": null,
+                "kind": "hidden",
+                "legality": "DNH",
+                "locked": false
+              },
+              {
+                "color": "white",
+                "kind": "tile",
+                "legality": "DNH",
+                "locked": false
+              },
+              {
+                "color": "orange",
+                "kind": "tile",
+                "legality": "RH",
+                "locked": false
+              },
+              {
+                "color": null,
+                "kind": "hidden",
+                "legality": "DNH",
+                "locked": false
+              },
+              {
+                "color": "purple",
+                "kind": "tile",
+                "legality": "RH",
+                "locked": false
+              }
+            ]
+          }
+        },
+        "tile": {
+          "id": "tile-05",
+          "bbox": [
+            613,
+            1565,
+            731,
+            1681
+          ],
+          "color": "orange",
+          "legality": "RH",
+          "confidence": 0.932,
+          "color_confidence": 0.917,
+          "kind": "tile",
+          "occupancy": null,
+          "capacity": null,
+          "locked": false,
+          "number": null,
+          "mechanic_overlays": [],
+          "center": [
+            672,
+            1623
+          ]
+        },
+        "score": 0.883,
+        "confidence": 0.902,
+        "requirements": [
+          {
+            "name": "tile_legality",
+            "status": "KNOWN",
+            "confidence": 0.932,
+            "source": "relief classifier: RH"
+          },
+          {
+            "name": "tile_color",
+            "status": "KNOWN",
+            "confidence": 0.917,
+            "source": "tile color: orange"
+          },
+          {
+            "name": "visible_current_state",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "screen: game"
+          },
+          {
+            "name": "feed_state",
+            "status": "UNCERTAIN",
+            "confidence": 0.467,
+            "source": "temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+          },
+          {
+            "name": "special_rule",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "ordinary tile"
+          },
+          {
+            "name": "lock_rule",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "no lock overlap detected"
+          },
+          {
+            "name": "other_mechanics",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "no additional tile mechanic observed"
+          }
+        ],
+        "assumptions": [
+          "feed_state=UNCERTAIN: temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+        ]
+      },
+      "tap": [
+        672,
+        1623
+      ],
+      "after_state": {
+        "screen": "game",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [
+          {
+            "id": "tile-01",
+            "bbox": [
+              481,
+              1396,
+              599,
+              1529
+            ],
+            "color": "purple",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.667,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1462
+            ]
+          },
+          {
+            "id": "tile-02",
+            "bbox": [
+              745,
+              1384,
+              863,
+              1529
+            ],
+            "color": "blue",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.97,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              804,
+              1456
+            ]
+          },
+          {
+            "id": "tile-03",
+            "bbox": [
+              745,
+              1543,
+              863,
+              1677
+            ],
+            "color": "blue",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.861,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              804,
+              1610
+            ]
+          },
+          {
+            "id": "tile-04",
+            "bbox": [
+              349,
+              1656,
+              467,
+              1824
+            ],
+            "color": "cyan",
+            "legality": "RH",
+            "confidence": 0.875,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              408,
+              1740
+            ]
+          },
+          {
+            "id": "tile-05",
+            "bbox": [
+              481,
+              1690,
+              599,
+              1824
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1757
+            ]
+          },
+          {
+            "id": "tile-06",
+            "bbox": [
+              745,
+              1712,
+              866,
+              1828
+            ],
+            "color": null,
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.0,
+            "kind": "hidden",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              805,
+              1770
+            ]
+          },
+          {
+            "id": "tile-07",
+            "bbox": [
+              349,
+              1860,
+              467,
+              1971
+            ],
+            "color": "red",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.889,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1915
+            ]
+          },
+          {
+            "id": "tile-08",
+            "bbox": [
+              613,
+              1804,
+              731,
+              1971
+            ],
+            "color": "green",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.667,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1887
+            ]
+          },
+          {
+            "id": "tile-09",
+            "bbox": [
+              745,
+              1860,
+              863,
+              1971
+            ],
+            "color": "indigo",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.75,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              804,
+              1915
+            ]
+          }
+        ],
+        "board_region": [
+          349,
+          1384,
+          866,
+          1971
+        ],
+        "feed": {
+          "current": "white",
+          "upcoming": [
+            "orange",
+            "pink",
+            "indigo",
+            null
+          ],
+          "confidence": 0.895,
+          "source": "visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left",
+          "direction": "from_left_toward_outlet",
+          "direction_confidence": 0.86,
+          "current_status": "direct",
+          "upcoming_status": "direct",
+          "outlet_status": "tracked",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [],
+        "modal_substate": null
+      },
+      "outcomes": {
+        "interaction": "ACTION_ACCEPTED",
+        "interaction_reason": "chosen_disappeared",
+        "strategic": "IN_PROGRESS",
+        "local_effect_observed": true,
+        "local_effect_attribution": "ambiguous"
+      },
+      "timings_ms": {
+        "capture": 1229.98,
+        "policy": 716.86,
+        "tap": 215.81,
+        "verify_capture": 2450.24
+      },
+      "uncertain_assumptions": [
+        "feed_state=UNCERTAIN: temporarily carried feed belief (age 1/2 frames): outlet found; bead color unresolved"
+      ],
+      "frames": {
+        "before": "frames/step-000019-before.jpg",
+        "after": "frames/step-000019-after.jpg"
+      }
+    },
+    {
+      "schema_version": 2,
+      "acceptance_model_version": "tile-local-v2",
+      "run_id": "20261001T171840Z-0a4cab5f",
+      "step_id": "step-000020",
+      "before_state": {
+        "screen": "game",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [
+          {
+            "id": "tile-01",
+            "bbox": [
+              481,
+              1396,
+              599,
+              1529
+            ],
+            "color": "purple",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.667,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1462
+            ]
+          },
+          {
+            "id": "tile-02",
+            "bbox": [
+              745,
+              1384,
+              863,
+              1529
+            ],
+            "color": "blue",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.97,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              804,
+              1456
+            ]
+          },
+          {
+            "id": "tile-03",
+            "bbox": [
+              745,
+              1543,
+              863,
+              1677
+            ],
+            "color": "blue",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.861,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              804,
+              1610
+            ]
+          },
+          {
+            "id": "tile-04",
+            "bbox": [
+              349,
+              1656,
+              467,
+              1824
+            ],
+            "color": "cyan",
+            "legality": "RH",
+            "confidence": 0.875,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              408,
+              1740
+            ]
+          },
+          {
+            "id": "tile-05",
+            "bbox": [
+              481,
+              1690,
+              599,
+              1824
+            ],
+            "color": "orange",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1757
+            ]
+          },
+          {
+            "id": "tile-06",
+            "bbox": [
+              745,
+              1712,
+              866,
+              1828
+            ],
+            "color": null,
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.0,
+            "kind": "hidden",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              805,
+              1770
+            ]
+          },
+          {
+            "id": "tile-07",
+            "bbox": [
+              349,
+              1860,
+              467,
+              1971
+            ],
+            "color": "red",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.889,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              408,
+              1915
+            ]
+          },
+          {
+            "id": "tile-08",
+            "bbox": [
+              613,
+              1804,
+              731,
+              1971
+            ],
+            "color": "green",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.667,
+            "kind": "special",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              672,
+              1887
+            ]
+          },
+          {
+            "id": "tile-09",
+            "bbox": [
+              745,
+              1860,
+              863,
+              1971
+            ],
+            "color": "indigo",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.75,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              804,
+              1915
+            ]
+          }
+        ],
+        "board_region": [
+          349,
+          1384,
+          866,
+          1971
+        ],
+        "feed": {
+          "current": "white",
+          "upcoming": [
+            "orange",
+            "pink",
+            "indigo",
+            null
+          ],
+          "confidence": 0.895,
+          "source": "visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left",
+          "direction": "from_left_toward_outlet",
+          "direction_confidence": 0.86,
+          "current_status": "direct",
+          "upcoming_status": "direct",
+          "outlet_status": "tracked",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [],
+        "modal_substate": null
+      },
+      "candidates": [
+        {
+          "key": "tile@19,17",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "blue",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": null,
+              "mechanic_overlays": [],
+              "mechanic_overlay_status": "NONE",
+              "mechanic_rule_status": "KNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "white",
+              "feed_upcoming": [
+                "orange",
+                "pink",
+                "indigo",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.86,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  []
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "white",
+                  "upcoming": [
+                    "orange",
+                    "pink",
+                    "indigo"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.88,
+                "y": 0.385,
+                "aspect_ratio": 0.881
+              },
+              "neighbors": [
+                {
+                  "color": "blue",
+                  "kind": "special",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": null,
+                  "kind": "hidden",
+                  "legality": "DNH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-03",
+            "bbox": [
+              745,
+              1543,
+              863,
+              1677
+            ],
+            "color": "blue",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.861,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              804,
+              1610
+            ]
+          },
+          "score": 0.883,
+          "confidence": 0.886,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.99,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "KNOWN",
+              "confidence": 0.861,
+              "source": "tile color: blue"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no additional tile mechanic observed"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+          ]
+        },
+        {
+          "key": "tile@09,18",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "cyan",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": "key",
+              "mechanic_overlays": [
+                "key"
+              ],
+              "mechanic_overlay_status": "KNOWN",
+              "mechanic_rule_status": "UNKNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "white",
+              "feed_upcoming": [
+                "orange",
+                "pink",
+                "indigo",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.86,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  [
+                    "key"
+                  ]
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "white",
+                  "upcoming": [
+                    "orange",
+                    "pink",
+                    "indigo"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.114,
+                "y": 0.606,
+                "aspect_ratio": 0.702
+              },
+              "neighbors": [
+                {
+                  "color": "orange",
+                  "kind": "tile",
+                  "legality": "RH",
+                  "locked": false
+                },
+                {
+                  "color": "red",
+                  "kind": "tile",
+                  "legality": "DNH",
+                  "locked": false
+                },
+                {
+                  "color": "green",
+                  "kind": "special",
+                  "legality": "DNH",
+                  "locked": false
+                }
+              ]
+            }
+          },
+          "tile": {
+            "id": "tile-04",
+            "bbox": [
+              349,
+              1656,
+              467,
+              1824
+            ],
+            "color": "cyan",
+            "legality": "RH",
+            "confidence": 0.875,
+            "color_confidence": 0.833,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [
+              "key"
+            ],
+            "center": [
+              408,
+              1740
+            ]
+          },
+          "score": 0.857,
+          "confidence": 0.773,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.875,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "KNOWN",
+              "confidence": 0.833,
+              "source": "tile color: cyan"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible key overlay; behavior unresolved"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ",
+            "other_mechanics=UNCERTAIN: visible key overlay; behavior unresolved"
+          ]
+        },
+        {
+          "key": "tile@12,15",
+          "context": {
+            "mechanic_id": "tile-selection",
+            "features": {
+              "tile_color": "purple",
+              "tile_kind": "tile",
+              "tile_legality": "RH",
+              "mechanic_overlay": null,
+              "mechanic_overlays": [],
+              "mechanic_overlay_status": "NONE",
+              "mechanic_rule_status": "KNOWN",
+              "tile_locked": false,
+              "lock_overlap": false,
+              "feed_current": "white",
+              "feed_upcoming": [
+                "orange",
+                "pink",
+                "indigo",
+                null
+              ],
+              "feed_direction": "from_left_toward_outlet",
+              "feed_direction_confidence": 0.86,
+              "feed_class": "known",
+              "feed_match": "unmatched",
+              "feed_match_offset": null,
+              "retry_context_version": "context-v1",
+              "retry_context": {
+                "tile_state": [
+                  "RH",
+                  "tile",
+                  false,
+                  null,
+                  null,
+                  null,
+                  []
+                ],
+                "lock_overlap": false,
+                "feed": {
+                  "current": "white",
+                  "upcoming": [
+                    "orange",
+                    "pink",
+                    "indigo"
+                  ]
+                }
+              },
+              "local_geometry": {
+                "x": 0.369,
+                "y": 0.133,
+                "aspect_ratio": 0.887
+              },
+              "neighbors": []
+            }
+          },
+          "tile": {
+            "id": "tile-01",
+            "bbox": [
+              481,
+              1396,
+              599,
+              1529
+            ],
+            "color": "purple",
+            "legality": "RH",
+            "confidence": 0.99,
+            "color_confidence": 0.667,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              540,
+              1462
+            ]
+          },
+          "score": 0.8326,
+          "confidence": 0.858,
+          "requirements": [
+            {
+              "name": "tile_legality",
+              "status": "KNOWN",
+              "confidence": 0.99,
+              "source": "relief classifier: RH"
+            },
+            {
+              "name": "tile_color",
+              "status": "LIKELY",
+              "confidence": 0.667,
+              "source": "tile color: purple"
+            },
+            {
+              "name": "visible_current_state",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "screen: game"
+            },
+            {
+              "name": "feed_state",
+              "status": "UNCERTAIN",
+              "confidence": 0.35,
+              "source": "visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+            },
+            {
+              "name": "special_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "ordinary tile"
+            },
+            {
+              "name": "lock_rule",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no lock overlap detected"
+            },
+            {
+              "name": "other_mechanics",
+              "status": "KNOWN",
+              "confidence": 1.0,
+              "source": "no additional tile mechanic observed"
+            }
+          ],
+          "assumptions": [
+            "feed_state=UNCERTAIN: visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+          ]
+        }
+      ],
+      "chosen": {
+        "key": "tile@19,17",
+        "context": {
+          "mechanic_id": "tile-selection",
+          "features": {
+            "tile_color": "blue",
+            "tile_kind": "tile",
+            "tile_legality": "RH",
+            "mechanic_overlay": null,
+            "mechanic_overlays": [],
+            "mechanic_overlay_status": "NONE",
+            "mechanic_rule_status": "KNOWN",
+            "tile_locked": false,
+            "lock_overlap": false,
+            "feed_current": "white",
+            "feed_upcoming": [
+              "orange",
+              "pink",
+              "indigo",
+              null
+            ],
+            "feed_direction": "from_left_toward_outlet",
+            "feed_direction_confidence": 0.86,
+            "feed_class": "known",
+            "feed_match": "unmatched",
+            "feed_match_offset": null,
+            "retry_context_version": "context-v1",
+            "retry_context": {
+              "tile_state": [
+                "RH",
+                "tile",
+                false,
+                null,
+                null,
+                null,
+                []
+              ],
+              "lock_overlap": false,
+              "feed": {
+                "current": "white",
+                "upcoming": [
+                  "orange",
+                  "pink",
+                  "indigo"
+                ]
+              }
+            },
+            "local_geometry": {
+              "x": 0.88,
+              "y": 0.385,
+              "aspect_ratio": 0.881
+            },
+            "neighbors": [
+              {
+                "color": "blue",
+                "kind": "special",
+                "legality": "DNH",
+                "locked": false
+              },
+              {
+                "color": null,
+                "kind": "hidden",
+                "legality": "DNH",
+                "locked": false
+              }
+            ]
+          }
+        },
+        "tile": {
+          "id": "tile-03",
+          "bbox": [
+            745,
+            1543,
+            863,
+            1677
+          ],
+          "color": "blue",
+          "legality": "RH",
+          "confidence": 0.99,
+          "color_confidence": 0.861,
+          "kind": "tile",
+          "occupancy": null,
+          "capacity": null,
+          "locked": false,
+          "number": null,
+          "mechanic_overlays": [],
+          "center": [
+            804,
+            1610
+          ]
+        },
+        "score": 0.883,
+        "confidence": 0.886,
+        "requirements": [
+          {
+            "name": "tile_legality",
+            "status": "KNOWN",
+            "confidence": 0.99,
+            "source": "relief classifier: RH"
+          },
+          {
+            "name": "tile_color",
+            "status": "KNOWN",
+            "confidence": 0.861,
+            "source": "tile color: blue"
+          },
+          {
+            "name": "visible_current_state",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "screen: game"
+          },
+          {
+            "name": "feed_state",
+            "status": "UNCERTAIN",
+            "confidence": 0.35,
+            "source": "visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+          },
+          {
+            "name": "special_rule",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "ordinary tile"
+          },
+          {
+            "name": "lock_rule",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "no lock overlap detected"
+          },
+          {
+            "name": "other_mechanics",
+            "status": "KNOWN",
+            "confidence": 1.0,
+            "source": "no additional tile mechanic observed"
+          }
+        ],
+        "assumptions": [
+          "feed_state=UNCERTAIN: visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+        ]
+      },
+      "tap": [
+        804,
+        1610
+      ],
+      "after_state": {
+        "screen": "out_of_space",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [],
+        "board_region": null,
+        "feed": {
+          "current": null,
+          "upcoming": [
+            null
+          ],
+          "confidence": 0.0,
+          "source": "concealed conveyor region; current and upcoming colors unknown",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "concealed",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [
+          {
+            "kind": "close",
+            "center": [
+              540,
+              2273
+            ],
+            "confidence": 0.92,
+            "cost": null,
+            "requires_ad": false
+          }
+        ],
+        "modal_substate": "life_warning"
+      },
+      "outcomes": {
+        "interaction": "ACTION_ACCEPTED",
+        "interaction_reason": "chosen_disappeared",
+        "strategic": "IN_PROGRESS",
+        "local_effect_observed": true,
+        "local_effect_attribution": "ambiguous"
+      },
+      "timings_ms": {
+        "capture": 2450.24,
+        "policy": 776.05,
+        "tap": 186.12,
+        "verify_capture": 1197.09
+      },
+      "uncertain_assumptions": [
+        "feed_state=UNCERTAIN: visible outlet bead at tracked outlet geometry; left-approach lookahead pending temporal confirmation; temporal advancement confirmed from left; tile/feed colors differ"
+      ],
+      "frames": {
+        "before": "frames/step-000020-before.jpg",
+        "after": "frames/step-000020-after.jpg"
+      }
+    },
+    {
+      "schema_version": 2,
+      "acceptance_model_version": "tile-local-v2",
+      "run_id": "20261001T171840Z-0a4cab5f",
+      "step_id": "step-000021",
+      "before_state": {
+        "screen": "out_of_space",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [],
+        "board_region": null,
+        "feed": {
+          "current": null,
+          "upcoming": [
+            null
+          ],
+          "confidence": 0.0,
+          "source": "concealed conveyor region; current and upcoming colors unknown",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "concealed",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [
+          {
+            "kind": "close",
+            "center": [
+              540,
+              2273
+            ],
+            "confidence": 0.92,
+            "cost": null,
+            "requires_ad": false
+          }
+        ],
+        "modal_substate": "life_warning"
+      },
+      "candidates": [],
+      "chosen": null,
+      "tap": [
+        540,
+        2273
+      ],
+      "after_state": {
+        "screen": "unknown",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [
+          {
+            "id": "tile-01",
+            "bbox": [
+              645,
+              1826,
+              736,
+              1947
+            ],
+            "color": "red",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.889,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              690,
+              1886
+            ]
+          },
+          {
+            "id": "tile-02",
+            "bbox": [
+              794,
+              1842,
+              891,
+              1948
+            ],
+            "color": "blue",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.97,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              842,
+              1895
+            ]
+          },
+          {
+            "id": "tile-03",
+            "bbox": [
+              496,
+              1853,
+              581,
+              1937
+            ],
+            "color": "blue",
+            "legality": "RH",
+            "confidence": 0.69,
+            "color_confidence": 0.861,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              538,
+              1895
+            ]
+          },
+          {
+            "id": "tile-04",
+            "bbox": [
+              205,
+              1859,
+              352,
+              1977
+            ],
+            "color": "yellow",
+            "legality": "RH",
+            "confidence": 0.897,
+            "color_confidence": 0.694,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              278,
+              1918
+            ]
+          }
+        ],
+        "board_region": [
+          205,
+          1826,
+          891,
+          1977
+        ],
+        "feed": {
+          "current": null,
+          "upcoming": [],
+          "confidence": 0.0,
+          "source": "unresolved: outlet geometry not found",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "unknown",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [
+          "No confident gameplay board was detected."
+        ],
+        "progress": null,
+        "controls": [],
+        "modal_substate": null
+      },
+      "outcomes": {
+        "interaction": "ACTION_ACCEPTED",
+        "interaction_reason": "unknown",
+        "strategic": "UNKNOWN",
+        "local_effect_observed": false,
+        "local_effect_attribution": "none"
+      },
+      "timings_ms": {
+        "tap": 145.93,
+        "verify_capture": 793.85
+      },
+      "uncertain_assumptions": [],
+      "frames": {
+        "before": "frames/step-000021-before.jpg",
+        "after": "frames/step-000021-after.jpg"
+      }
+    },
+    {
+      "schema_version": 2,
+      "acceptance_model_version": "tile-local-v2",
+      "run_id": "20261001T171840Z-0a4cab5f",
+      "step_id": "step-000022",
+      "before_state": {
+        "screen": "unknown",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [
+          {
+            "id": "tile-01",
+            "bbox": [
+              645,
+              1826,
+              736,
+              1947
+            ],
+            "color": "red",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.889,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              690,
+              1886
+            ]
+          },
+          {
+            "id": "tile-02",
+            "bbox": [
+              794,
+              1842,
+              891,
+              1948
+            ],
+            "color": "blue",
+            "legality": "DNH",
+            "confidence": 0.86,
+            "color_confidence": 0.97,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              842,
+              1895
+            ]
+          },
+          {
+            "id": "tile-03",
+            "bbox": [
+              496,
+              1853,
+              581,
+              1937
+            ],
+            "color": "blue",
+            "legality": "RH",
+            "confidence": 0.69,
+            "color_confidence": 0.861,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              538,
+              1895
+            ]
+          },
+          {
+            "id": "tile-04",
+            "bbox": [
+              205,
+              1859,
+              352,
+              1977
+            ],
+            "color": "yellow",
+            "legality": "RH",
+            "confidence": 0.897,
+            "color_confidence": 0.694,
+            "kind": "tile",
+            "occupancy": null,
+            "capacity": null,
+            "locked": false,
+            "number": null,
+            "mechanic_overlays": [],
+            "center": [
+              278,
+              1918
+            ]
+          }
+        ],
+        "board_region": [
+          205,
+          1826,
+          891,
+          1977
+        ],
+        "feed": {
+          "current": null,
+          "upcoming": [],
+          "confidence": 0.0,
+          "source": "unresolved: outlet geometry not found",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "unknown",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [
+          "No confident gameplay board was detected."
+        ],
+        "progress": null,
+        "controls": [],
+        "modal_substate": null
+      },
+      "candidates": [],
+      "chosen": null,
+      "tap": null,
+      "after_state": {
+        "screen": "out_of_space",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [],
+        "board_region": null,
+        "feed": {
+          "current": null,
+          "upcoming": [],
+          "confidence": 0.0,
+          "source": "unresolved: outlet geometry not found",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "unknown",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [
+          {
+            "kind": "close",
+            "center": [
+              999,
+              419
+            ],
+            "confidence": 0.98,
+            "cost": null,
+            "requires_ad": false
+          }
+        ],
+        "modal_substate": "space_offer"
+      },
+      "outcomes": {
+        "interaction": "NOT_ATTEMPTED",
+        "interaction_reason": "not_attempted",
+        "strategic": "IN_PROGRESS",
+        "local_effect_observed": false,
+        "local_effect_attribution": "none"
+      },
+      "timings_ms": {
+        "verify_capture": 809.45
+      },
+      "uncertain_assumptions": [],
+      "frames": {
+        "before": "frames/step-000022-before.jpg",
+        "after": "frames/step-000022-after.jpg"
+      }
+    },
+    {
+      "schema_version": 2,
+      "acceptance_model_version": "tile-local-v2",
+      "run_id": "20261001T171840Z-0a4cab5f",
+      "step_id": "step-000023",
+      "before_state": {
+        "screen": "out_of_space",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [],
+        "board_region": null,
+        "feed": {
+          "current": null,
+          "upcoming": [],
+          "confidence": 0.0,
+          "source": "unresolved: outlet geometry not found",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "unknown",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [
+          {
+            "kind": "close",
+            "center": [
+              999,
+              419
+            ],
+            "confidence": 0.98,
+            "cost": null,
+            "requires_ad": false
+          }
+        ],
+        "modal_substate": "space_offer"
+      },
+      "candidates": [],
+      "chosen": null,
+      "tap": [
+        999,
+        419
+      ],
+      "after_state": {
+        "screen": "out_of_space",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [],
+        "board_region": null,
+        "feed": {
+          "current": null,
+          "upcoming": [],
+          "confidence": 0.0,
+          "source": "unresolved: outlet geometry not found",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "unknown",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [
+          {
+            "kind": "close",
+            "center": [
+              999,
+              419
+            ],
+            "confidence": 0.98,
+            "cost": null,
+            "requires_ad": false
+          }
+        ],
+        "modal_substate": "life_warning"
+      },
+      "outcomes": {
+        "interaction": "ACTION_ACCEPTED",
+        "interaction_reason": "unknown",
+        "strategic": "IN_PROGRESS",
+        "local_effect_observed": false,
+        "local_effect_attribution": "none"
+      },
+      "timings_ms": {
+        "tap": 172.05,
+        "verify_capture": 1129.37
+      },
+      "uncertain_assumptions": [],
+      "frames": {
+        "before": "frames/step-000023-before.jpg",
+        "after": "frames/step-000023-after.jpg"
+      }
+    },
+    {
+      "schema_version": 2,
+      "acceptance_model_version": "tile-local-v2",
+      "run_id": "20261001T171840Z-0a4cab5f",
+      "step_id": "step-000024",
+      "before_state": {
+        "screen": "out_of_space",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [],
+        "board_region": null,
+        "feed": {
+          "current": null,
+          "upcoming": [],
+          "confidence": 0.0,
+          "source": "unresolved: outlet geometry not found",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "unknown",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [
+          {
+            "kind": "close",
+            "center": [
+              999,
+              419
+            ],
+            "confidence": 0.98,
+            "cost": null,
+            "requires_ad": false
+          }
+        ],
+        "modal_substate": "life_warning"
+      },
+      "candidates": [],
+      "chosen": null,
+      "tap": [
+        999,
+        419
+      ],
+      "after_state": {
+        "screen": "failure",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [],
+        "board_region": null,
+        "feed": {
+          "current": null,
+          "upcoming": [],
+          "confidence": 0.0,
+          "source": "unresolved: outlet geometry not found",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "unknown",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [
+          {
+            "kind": "dismiss_failure",
+            "center": [
+              936,
+              728
+            ],
+            "confidence": 0.865,
+            "cost": null,
+            "requires_ad": false
+          }
+        ],
+        "modal_substate": null
+      },
+      "outcomes": {
+        "interaction": "ACTION_ACCEPTED",
+        "interaction_reason": "unknown",
+        "strategic": "LEVEL_FAILURE",
+        "local_effect_observed": false,
+        "local_effect_attribution": "none"
+      },
+      "timings_ms": {
+        "tap": 216.72,
+        "verify_capture": 788.01
+      },
+      "uncertain_assumptions": [],
+      "frames": {
+        "before": "frames/step-000024-before.jpg",
+        "after": "frames/step-000024-after.jpg"
+      }
+    },
+    {
+      "schema_version": 2,
+      "acceptance_model_version": "tile-local-v2",
+      "run_id": "20261001T171840Z-0a4cab5f",
+      "step_id": "step-000025",
+      "before_state": {
+        "screen": "failure",
+        "width": 1080,
+        "height": 2400,
+        "tiles": [],
+        "board_region": null,
+        "feed": {
+          "current": null,
+          "upcoming": [],
+          "confidence": 0.0,
+          "source": "unresolved: outlet geometry not found",
+          "direction": null,
+          "direction_confidence": 0.0,
+          "current_status": "unknown",
+          "upcoming_status": "unknown",
+          "outlet_status": "unknown",
+          "age_frames": 0
+        },
+        "difficulty": null,
+        "locks": [],
+        "warnings": [],
+        "progress": null,
+        "controls": [
+          {
+            "kind": "dismiss_failure",
+            "center": [
+              936,
+              728
+            ],
+            "confidence": 0.865,
+            "cost": null,
+            "requires_ad": false
+          }
+        ],
+        "modal_substate": null
+      },
+      "candidates": [],
+      "chosen": null,
+      "tap": null,
+      "after_state": null,
+      "outcomes": {
+        "interaction": "NOT_ATTEMPTED",
+        "interaction_reason": "not_attempted",
+        "strategic": "LEVEL_FAILURE",
+        "local_effect_observed": false,
+        "local_effect_attribution": "none"
+      },
+      "timings_ms": {},
+      "uncertain_assumptions": [],
+      "frames": {
+        "before": "frames/step-000025-before.jpg",
+        "after": null
+      }
+    }
+  ],
+  "finished_at": "2026-10-01T17:19:42.629919+00:00"
+}

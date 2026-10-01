@@ -94,7 +94,7 @@ class RecordingTests(unittest.TestCase):
         event = json.loads(self.recorder.events_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(event["step_id"], step_id)
-        self.assertEqual(event["schema_version"], 2)
+        self.assertEqual(event["schema_version"], 3)
         self.assertEqual(event["acceptance_model_version"], "tile-local-v2")
         self.assertEqual(event["before_state"]["tiles"][0]["id"], "tile-1")
         self.assertEqual(event["after_state"]["tiles"], [])
@@ -413,7 +413,7 @@ class RecordingTests(unittest.TestCase):
         stored = json.loads(self.recorder.evidence_path.read_text(encoding="utf-8").splitlines()[0])
 
         self.assertEqual(tally.action_accepted, 1)
-        self.assertEqual(stored["schema_version"], 2)
+        self.assertEqual(stored["schema_version"], 3)
         self.assertEqual(stored["acceptance_model_version"], "tile-local-v2")
         self.assertEqual(stored["mechanic_id"], "magnet-lock")
         self.assertEqual(stored["features"]["unmodeled_future_feature"]["capture_revision"], 3)

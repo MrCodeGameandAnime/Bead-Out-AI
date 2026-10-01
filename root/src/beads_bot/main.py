@@ -8,11 +8,19 @@ from typing import Callable
 from PIL import Image
 
 from .board import GameState, InteractionOutcome, ScreenControl, StrategicOutcome
-from .capture import CapturedFrame, capture_frame
+from .capture import CapturedFrame, capture_frame, device_input_size
 from .debug import save_debug_image
 from .input import tap
 from .policy import ActionCandidate, Decision, choose_move, prune_attempted, rank_candidates
 from .recording import RunRecorder, classify_transition
+from .safety import (
+    ActionRisk,
+    ExecutorDecision,
+    classify_action_risk,
+    protected_state_violations,
+    revalidate_board_action,
+    revalidate_safe_control,
+)
 from .vision import FeedTracker, analyze_frame
 
 
@@ -31,6 +39,7 @@ def _state_dict(state: GameState, decision: Decision, times: dict[str, float]) -
         "difficulty": state.difficulty,
         "size": [state.width, state.height],
         "feed": asdict(state.feed),
+        "protected_state": asdict(state.protected_state),
         "board_region": state.board_region,
         "locks": [
             {
@@ -118,6 +127,13 @@ def _state_signature(state: GameState) -> tuple:
         ),
         tuple((lock.id, lock.center, lock.bbox) for lock in state.locks),
         tuple((control.kind, control.center, control.cost, control.requires_ad) for control in state.controls),
+        (
+            state.protected_state.coin_balance,
+            state.protected_state.coin_status,
+            state.protected_state.extra_holder_booster,
+            state.protected_state.holder_capacity,
+            state.protected_state.holder_capacity_status,
+        ),
     )
 
 
@@ -177,6 +193,9 @@ def _record_observation(
     timings: dict[str, float] | None = None,
     observation_reason: str | None = None,
     observation_index: int | None = None,
+    action_risk: ActionRisk = ActionRisk.BOARD_ACTION,
+    safety_violations: tuple[str, ...] = (),
+    execution_metadata: dict | None = None,
 ) -> str:
     return recorder.record_step(
         before_state=state,
@@ -195,6 +214,9 @@ def _record_observation(
         uncertain_assumptions=chosen.assumptions if chosen else (),
         observation_reason=observation_reason,
         observation_index=observation_index,
+        action_risk=action_risk,
+        safety_violations=safety_violations,
+        execution_metadata=execution_metadata,
     )
 
 
@@ -259,6 +281,8 @@ def run_live(
     analyze_fn: Callable = analyze_frame,
     recorder_factory: Callable = RunRecorder.create,
     sleep_fn: Callable = time.sleep,
+    input_size_fn: Callable = device_input_size,
+    revalidation_capture_fn: Callable | None = None,
 ) -> dict:
     """Run continuously when enabled; injected I/O keeps the loop testable offline."""
     debug_root = args.debug_dir or Path("root/debug")
@@ -269,6 +293,7 @@ def run_live(
     attempt_history: list[dict] = []
     last_finalized: dict | None = None
     feed_tracker = FeedTracker()
+    revalidate_capture = revalidation_capture_fn or capture_fn
 
     def observe_frame(frame: CapturedFrame) -> GameState:
         return feed_tracker.observe(frame.image, analyze_fn(frame.image))
@@ -294,6 +319,112 @@ def run_live(
         summary["attempt_history"] = list(attempt_history)
         return summary
 
+    def prepare_execution(
+        state: GameState,
+        planned_coordinate: tuple[int, int],
+        *,
+        action_name: str,
+        risk: ActionRisk,
+        candidate: ActionCandidate | None = None,
+        control: ScreenControl | None = None,
+    ) -> tuple[CapturedFrame | None, GameState | None, object | None, dict, tuple[str, ...], str | None]:
+        """Capture and validate immediately before any physical input."""
+        try:
+            fresh_frame = revalidate_capture(args.adb, args.serial)
+            fresh_state = observe_frame(fresh_frame)
+            try:
+                device_size = input_size_fn(args.adb, args.serial)
+            except Exception:
+                device_size = None
+        except Exception as error:
+            return None, None, None, {
+                "planned_action": action_name,
+                "planned_coordinate": list(planned_coordinate),
+                "execution_risk": risk.value,
+                "executor_decision": "BLOCKED",
+                "revalidation": "failed",
+                "reason": "revalidation_capture_failed",
+                "actual_coordinate_sent_to_adb": None,
+            }, (), str(error)
+        capture_size = fresh_frame.image.size
+        if candidate is not None:
+            validation = revalidate_board_action(
+                state, candidate, fresh_state, capture_size, device_size,
+            )
+        elif control is not None:
+            validation = revalidate_safe_control(
+                state, control, fresh_state, capture_size, device_size,
+            )
+        else:
+            validation = None
+        pre_violations = protected_state_violations(state, fresh_state, risk)
+        mapping = validation.coordinate_mapping if validation is not None else None
+        metadata = {
+            "planned_action": action_name,
+            "planned_target": None if candidate is None else {
+                "tile_id": candidate.tile.id,
+                "bbox": list(candidate.tile.bbox),
+                "mechanic_overlays": list(candidate.tile.mechanic_overlays),
+            },
+            "planned_coordinate": list(planned_coordinate),
+            "revalidated_target": None if validation is None or validation.target is None else {
+                "tile_id": validation.target.id,
+                "bbox": list(validation.target.bbox),
+                "center": list(validation.target.center),
+                "mechanic_overlays": list(validation.target.mechanic_overlays),
+            },
+            "revalidation": "passed" if validation and validation.executor_decision == ExecutorDecision.ALLOWED else "failed",
+            "executor_decision": validation.executor_decision.value if validation else "BLOCKED",
+            "execution_risk": risk.value,
+            "reason": validation.reason if validation else "unknown_action",
+            "capture_width": capture_size[0],
+            "capture_height": capture_size[1],
+            "device_input_width": None if device_size is None else device_size[0],
+            "device_input_height": None if device_size is None else device_size[1],
+            "planned_capture_coordinate": list(planned_coordinate),
+            "revalidated_capture_coordinate": None if validation is None or validation.revalidated_capture_coordinate is None else list(validation.revalidated_capture_coordinate),
+            "transformed_input_coordinate": None if mapping is None or mapping.input_coordinate is None else list(mapping.input_coordinate),
+            "coordinate_transform": None if mapping is None else mapping.transform,
+            "outgoing_coordinate": None if validation is None or validation.outgoing_coordinate is None else list(validation.outgoing_coordinate),
+            "actual_coordinate_sent_to_adb": None,
+            "pre_action_protected_state": asdict(fresh_state.protected_state),
+            "post_action_protected_state": None,
+            "safety_violations": list(pre_violations),
+        }
+        if pre_violations:
+            metadata["executor_decision"] = "BLOCKED"
+            metadata["revalidation"] = "failed"
+            metadata["reason"] = pre_violations[0]
+            metadata["outgoing_coordinate"] = None
+        return fresh_frame, fresh_state, validation, metadata, pre_violations, None
+
+    def add_post_protected_state(
+        metadata: dict,
+        before_state: GameState,
+        after_state: GameState | None,
+        risk: ActionRisk,
+    ) -> tuple[str, ...]:
+        if after_state is None:
+            return ()
+        metadata["post_action_protected_state"] = asdict(after_state.protected_state)
+        violations = protected_state_violations(before_state, after_state, risk)
+        metadata["safety_violations"] = list(dict.fromkeys(metadata.get("safety_violations", []) + list(violations)))
+        return violations
+
+    def send_validated(validation, metadata: dict) -> tuple[float | None, str | None]:
+        nonlocal input_count
+        if validation is None or validation.executor_decision != ExecutorDecision.ALLOWED:
+            return None, None
+        outgoing = validation.outgoing_coordinate
+        if outgoing is None:
+            return None, "executor produced no outgoing coordinate"
+        metadata["actual_coordinate_sent_to_adb"] = list(outgoing)
+        input_count += 1
+        try:
+            return float(tap_fn(outgoing[0], outgoing[1], args.adb, args.serial)), None
+        except Exception as error:
+            return None, str(error)
+
     try:
         current_frame = capture_fn(args.adb, args.serial)
         current_state = observe_frame(current_frame)
@@ -302,6 +433,7 @@ def run_live(
 
     attempted: list[ActionCandidate] = []
     unknown_reobservations = 0
+    stale_action_aborts = 0
     while True:
         state = current_state
         frame = current_frame.image
@@ -335,23 +467,77 @@ def run_live(
                 interaction=InteractionOutcome.NOT_ATTEMPTED,
                 strategic=StrategicOutcome.LEVEL_FAILURE,
             )
-            failed_attempt = finish_attempt("failure", "confirmed Level Failed screen")
             if not args.execute:
-                return failed_attempt
+                return finish_attempt("failure", "confirmed Level Failed screen")
             control = _safe_navigation_control(state)
             if control is None:
+                failed_attempt = finish_attempt("failure", "confirmed Level Failed screen")
                 failed_attempt["session_status"] = "recovery_incomplete"
                 failed_attempt["session_reason"] = "no annotated failure close target was recognized"
                 return failed_attempt
+            risk = classify_action_risk(control=control)
+            fresh_frame, fresh_state, validation, execution, pre_violations, prep_error = prepare_execution(
+                state, control.center, action_name=control.kind, risk=risk, control=control,
+            )
+            if prep_error or fresh_state is None or validation is None:
+                execution["reason"] = execution.get("reason") or "stale_action_aborted"
+                _record_observation(
+                    recorder, frame=frame, state=state, after_state=fresh_state,
+                    after_frame=None if fresh_frame is None else fresh_frame.image,
+                    interaction=InteractionOutcome.UNKNOWN if prep_error else InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.LEVEL_FAILURE,
+                    action_risk=risk,
+                    execution_metadata=execution,
+                )
+                return finish_attempt("device_error" if prep_error else "failure", f"failure close was not safely revalidated: {prep_error or 'no fresh state'}")
+            if pre_violations or validation.executor_decision == ExecutorDecision.BLOCKED:
+                violations = pre_violations or (validation.reason,)
+                execution["safety_violations"] = list(violations)
+                _record_observation(
+                    recorder, frame=frame, state=state, after_state=fresh_state,
+                    after_frame=fresh_frame.image, interaction=InteractionOutcome.SAFETY_VIOLATION,
+                    strategic=StrategicOutcome.LEVEL_FAILURE,
+                    interaction_reason=violations[0], action_risk=risk,
+                    safety_violations=violations, execution_metadata=execution,
+                )
+                return finish_attempt("safety_violation", violations[0])
+            if validation.executor_decision != ExecutorDecision.ALLOWED:
+                _record_observation(
+                    recorder, frame=frame, state=state, after_state=fresh_state,
+                    after_frame=fresh_frame.image, interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.LEVEL_FAILURE, action_risk=risk,
+                    execution_metadata=execution,
+                )
+                return finish_attempt("failure", "failure close target changed before execution")
+            click_ms, tap_error = send_validated(validation, execution)
+            if tap_error:
+                _record_observation(
+                    recorder, frame=fresh_frame.image, state=fresh_state, tap_point=validation.outgoing_coordinate,
+                    interaction=InteractionOutcome.UNKNOWN, strategic=StrategicOutcome.LEVEL_FAILURE,
+                    action_risk=risk, execution_metadata=execution,
+                )
+                return finish_attempt("device_error", f"failure dismissal failed: {tap_error}")
+            sleep_fn(max(0.0, args.settle_seconds))
             try:
-                tap_fn(control.center[0], control.center[1], args.adb, args.serial)
-                sleep_fn(max(0.0, args.settle_seconds))
                 next_frame = capture_fn(args.adb, args.serial)
                 next_state = observe_frame(next_frame)
             except Exception as error:
-                failed_attempt["session_status"] = "recovery_incomplete"
-                failed_attempt["session_reason"] = f"failure dismissal failed: {error}"
-                return failed_attempt
+                return finish_attempt("device_error", f"failure dismissal verification failed: {error}")
+            violations = add_post_protected_state(execution, fresh_state, next_state, risk)
+            _record_observation(
+                recorder, frame=fresh_frame.image, state=fresh_state,
+                tap_point=validation.outgoing_coordinate, after_state=next_state,
+                after_frame=next_frame.image,
+                interaction=InteractionOutcome.SAFETY_VIOLATION if violations else InteractionOutcome.ACTION_ACCEPTED,
+                strategic=StrategicOutcome.LEVEL_FAILURE,
+                interaction_reason=violations[0] if violations else "safe_navigation",
+                action_risk=risk, safety_violations=violations,
+                execution_metadata=execution,
+                timings={"tap": float(click_ms or 0.0), "verify_capture": next_frame.elapsed_ms},
+            )
+            if violations:
+                return finish_attempt("safety_violation", violations[0])
+            failed_attempt = finish_attempt("failure", "confirmed Level Failed screen")
             recorder = None
             action_count = 0
             input_count = 0
@@ -375,36 +561,85 @@ def run_live(
                     strategic=StrategicOutcome.IN_PROGRESS,
                 )
                 return finish_attempt("unrecognized_ui", f"{state.screen} has no safe navigation control")
-            try:
-                click_ms = tap_fn(control.center[0], control.center[1], args.adb, args.serial)
-                input_count += 1
-                sleep_fn(max(0.0, args.settle_seconds))
-                next_frame = capture_fn(args.adb, args.serial)
-                next_state = observe_frame(next_frame)
-            except Exception as error:
+            risk = classify_action_risk(control=control)
+            fresh_frame, fresh_state, validation, execution, pre_violations, prep_error = prepare_execution(
+                state, control.center, action_name=control.kind, risk=risk, control=control,
+            )
+            if prep_error or fresh_state is None or validation is None:
                 _record_observation(
                     recorder,
                     frame=frame,
                     state=state,
-                    tap_point=control.center,
-                    interaction=InteractionOutcome.UNKNOWN,
+                    after_state=fresh_state,
+                    after_frame=None if fresh_frame is None else fresh_frame.image,
+                    interaction=InteractionOutcome.UNKNOWN if prep_error else InteractionOutcome.NOT_ATTEMPTED,
                     strategic=StrategicOutcome.UNKNOWN,
-                    timings={"tap": 0.0},
+                    action_risk=risk,
+                    execution_metadata=execution,
                 )
-                return finish_attempt("device_error", f"navigation action failed: {error}")
+                return finish_attempt("device_error" if prep_error else "unrecognized_ui", f"navigation target could not be safely revalidated: {prep_error or 'no fresh state'}")
+            if pre_violations or validation.executor_decision == ExecutorDecision.BLOCKED:
+                violations = pre_violations or (validation.reason,)
+                execution["safety_violations"] = list(violations)
+                _record_observation(
+                    recorder, frame=frame, state=state, after_state=fresh_state,
+                    after_frame=fresh_frame.image, interaction=InteractionOutcome.SAFETY_VIOLATION,
+                    strategic=StrategicOutcome.IN_PROGRESS, interaction_reason=violations[0],
+                    action_risk=risk, safety_violations=violations, execution_metadata=execution,
+                )
+                return finish_attempt("safety_violation", violations[0])
+            if validation.executor_decision != ExecutorDecision.ALLOWED:
+                _record_observation(
+                    recorder, frame=frame, state=state, after_state=fresh_state,
+                    after_frame=fresh_frame.image, interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.IN_PROGRESS, action_risk=risk,
+                    execution_metadata=execution,
+                )
+                current_frame, current_state = fresh_frame, fresh_state
+                continue
+            click_ms, tap_error = send_validated(validation, execution)
+            if tap_error:
+                _record_observation(
+                    recorder, frame=fresh_frame.image, state=fresh_state,
+                    tap_point=validation.outgoing_coordinate, interaction=InteractionOutcome.UNKNOWN,
+                    strategic=StrategicOutcome.UNKNOWN, action_risk=risk,
+                    execution_metadata=execution,
+                )
+                return finish_attempt("device_error", f"navigation action failed: {tap_error}")
+            sleep_fn(max(0.0, args.settle_seconds))
+            try:
+                next_frame = capture_fn(args.adb, args.serial)
+                next_state = observe_frame(next_frame)
+            except Exception as error:
+                _record_observation(
+                    recorder, frame=fresh_frame.image, state=fresh_state,
+                    tap_point=validation.outgoing_coordinate,
+                    interaction=InteractionOutcome.UNKNOWN, strategic=StrategicOutcome.UNKNOWN,
+                    action_risk=risk, execution_metadata=execution,
+                )
+                return finish_attempt("device_error", f"navigation verification failed: {error}")
 
-            interaction, strategic = _control_transition_outcomes(state, next_state)
+            violations = add_post_protected_state(execution, fresh_state, next_state, risk)
+            interaction, strategic = _control_transition_outcomes(fresh_state, next_state)
+            if violations:
+                interaction = InteractionOutcome.SAFETY_VIOLATION
             _record_observation(
                 recorder,
-                frame=frame,
-                state=state,
-                tap_point=control.center,
+                frame=fresh_frame.image,
+                state=fresh_state,
+                tap_point=validation.outgoing_coordinate,
                 after_state=next_state,
                 after_frame=next_frame.image,
                 interaction=interaction,
                 strategic=strategic,
-                timings={"tap": float(click_ms), "verify_capture": next_frame.elapsed_ms},
+                interaction_reason=violations[0] if violations else None,
+                action_risk=risk,
+                safety_violations=violations,
+                execution_metadata=execution,
+                timings={"tap": float(click_ms or 0.0), "verify_capture": next_frame.elapsed_ms},
             )
+            if violations:
+                return finish_attempt("safety_violation", violations[0])
             if interaction == InteractionOutcome.NO_CHANGE:
                 return finish_attempt("no_progress", f"{state.screen} navigation target produced no state change")
             if state.screen == "home" and next_state.screen == "game":
@@ -450,6 +685,8 @@ def run_live(
                 local_effect_attribution=transition.local_effect_attribution,
                 timings={"verify_capture": next_frame.elapsed_ms},
             )
+            if transition.interaction == InteractionOutcome.SAFETY_VIOLATION:
+                return finish_attempt("safety_violation", transition.safety_violations[0])
             unknown_reobservations = (
                 unknown_reobservations + 1 if next_state.screen == "unknown" else 0
             )
@@ -474,32 +711,75 @@ def run_live(
                     strategic=StrategicOutcome.LEVEL_SUCCESS,
                 )
                 return finish_attempt("success", reason)
+            risk = classify_action_risk(control=control)
+            fresh_frame, fresh_state, validation, execution, pre_violations, prep_error = prepare_execution(
+                state, control.center, action_name=control.kind, risk=risk, control=control,
+            )
+            if prep_error or fresh_state is None or validation is None:
+                _record_observation(
+                    recorder, frame=frame, state=state, after_state=fresh_state,
+                    after_frame=None if fresh_frame is None else fresh_frame.image,
+                    interaction=InteractionOutcome.UNKNOWN if prep_error else InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.LEVEL_SUCCESS, action_risk=risk,
+                    execution_metadata=execution,
+                )
+                return finish_attempt("device_error" if prep_error else "success", f"continuation target could not be safely revalidated: {prep_error or 'no fresh state'}")
+            if pre_violations or validation.executor_decision == ExecutorDecision.BLOCKED:
+                violations = pre_violations or (validation.reason,)
+                execution["safety_violations"] = list(violations)
+                _record_observation(
+                    recorder, frame=frame, state=state, after_state=fresh_state,
+                    after_frame=fresh_frame.image, interaction=InteractionOutcome.SAFETY_VIOLATION,
+                    strategic=StrategicOutcome.LEVEL_SUCCESS, interaction_reason=violations[0],
+                    action_risk=risk, safety_violations=violations, execution_metadata=execution,
+                )
+                return finish_attempt("safety_violation", violations[0])
+            if validation.executor_decision != ExecutorDecision.ALLOWED:
+                _record_observation(
+                    recorder, frame=frame, state=state, after_state=fresh_state,
+                    after_frame=fresh_frame.image, interaction=InteractionOutcome.NOT_ATTEMPTED,
+                    strategic=StrategicOutcome.LEVEL_SUCCESS, action_risk=risk,
+                    execution_metadata=execution,
+                )
+                return finish_attempt("success", "continuation target changed before execution")
+            click_ms, tap_error = send_validated(validation, execution)
+            if tap_error:
+                _record_observation(
+                    recorder, frame=fresh_frame.image, state=fresh_state,
+                    tap_point=validation.outgoing_coordinate,
+                    interaction=InteractionOutcome.UNKNOWN, strategic=StrategicOutcome.LEVEL_SUCCESS,
+                    action_risk=risk, execution_metadata=execution,
+                )
+                return finish_attempt("device_error", f"continuation action failed: {tap_error}")
+            sleep_fn(max(0.0, args.settle_seconds))
             try:
-                click_ms = tap_fn(control.center[0], control.center[1], args.adb, args.serial)
-                input_count += 1
-                sleep_fn(max(0.0, args.settle_seconds))
                 next_frame = capture_fn(args.adb, args.serial)
                 next_state = observe_frame(next_frame)
             except Exception as error:
                 _record_observation(
-                    recorder, frame=frame, state=state, tap_point=control.center,
-                    interaction=InteractionOutcome.UNKNOWN,
-                    strategic=StrategicOutcome.LEVEL_SUCCESS,
-                    timings={"tap": 0.0},
+                    recorder, frame=fresh_frame.image, state=fresh_state,
+                    tap_point=validation.outgoing_coordinate,
+                    interaction=InteractionOutcome.UNKNOWN, strategic=StrategicOutcome.LEVEL_SUCCESS,
+                    action_risk=risk, execution_metadata=execution,
                 )
-                return finish_attempt("device_error", f"continuation action failed: {error}")
-            changed = _state_signature(state) != _state_signature(next_state)
+                return finish_attempt("device_error", f"continuation verification failed: {error}")
+            violations = add_post_protected_state(execution, fresh_state, next_state, risk)
+            changed = _state_signature(fresh_state) != _state_signature(next_state)
             _record_observation(
                 recorder,
-                frame=frame,
-                state=state,
-                tap_point=control.center,
+                frame=fresh_frame.image,
+                state=fresh_state,
+                tap_point=validation.outgoing_coordinate,
                 after_state=next_state,
                 after_frame=next_frame.image,
-                interaction=InteractionOutcome.ACTION_ACCEPTED if changed else InteractionOutcome.NO_CHANGE,
+                interaction=InteractionOutcome.SAFETY_VIOLATION if violations else InteractionOutcome.ACTION_ACCEPTED if changed else InteractionOutcome.NO_CHANGE,
                 strategic=StrategicOutcome.LEVEL_SUCCESS,
-                timings={"tap": float(click_ms), "verify_capture": next_frame.elapsed_ms},
+                interaction_reason=violations[0] if violations else None,
+                action_risk=risk, safety_violations=violations, execution_metadata=execution,
+                timings={"tap": float(click_ms or 0.0), "verify_capture": next_frame.elapsed_ms},
             )
+            if violations:
+                return finish_attempt("safety_violation", violations[0])
             if next_state.screen == "game":
                 current_frame, current_state = next_frame, next_state
                 attempted.clear()
@@ -547,7 +827,11 @@ def run_live(
                     timings={"verify_capture": next_frame.elapsed_ms},
                     observation_reason="move_limit_boundary",
                     observation_index=observation_index,
+                    action_risk=ActionRisk.BOARD_ACTION,
+                    safety_violations=transition.safety_violations,
                 )
+                if transition.interaction == InteractionOutcome.SAFETY_VIOLATION:
+                    return finish_attempt("safety_violation", transition.safety_violations[0])
                 observation_state, observation_frame = next_state, next_frame.image
                 current_frame, current_state = next_frame, next_state
                 if next_state.screen != "game":
@@ -584,14 +868,11 @@ def run_live(
             )
             return finish_attempt("dry_run", "execution is disabled")
         click_started = time.perf_counter()
-        try:
-            click_ms = tap_fn(chosen.tile.center[0], chosen.tile.center[1], args.adb, args.serial)
-            input_count += 1
-            action_count += 1
-            sleep_fn(max(0.0, args.settle_seconds))
-            next_frame = capture_fn(args.adb, args.serial)
-            next_state = observe_frame(next_frame)
-        except Exception as error:
+        risk = classify_action_risk("tile-selection")
+        fresh_frame, fresh_state, validation, execution, pre_violations, prep_error = prepare_execution(
+            state, chosen.tile.center, action_name="tile-selection", risk=risk, candidate=chosen,
+        )
+        if prep_error or fresh_state is None or validation is None:
             click_elapsed = (time.perf_counter() - click_started) * 1000
             _record_observation(
                 recorder,
@@ -599,21 +880,76 @@ def run_live(
                 state=state,
                 candidates=candidates,
                 chosen=chosen,
-                tap_point=chosen.tile.center,
-                interaction=InteractionOutcome.UNKNOWN,
+                interaction=InteractionOutcome.UNKNOWN if prep_error else InteractionOutcome.NOT_ATTEMPTED,
                 strategic=StrategicOutcome.UNKNOWN,
-                timings={"policy": round(policy_ms, 2), "tap_and_capture": round(click_elapsed, 2)},
+                action_risk=risk,
+                execution_metadata=execution,
+                timings={"policy": round(policy_ms, 2), "revalidation": round(click_elapsed, 2)},
             )
-            return finish_attempt("device_error", f"action execution failed: {error}")
+            return finish_attempt("device_error", f"action safety revalidation failed: {prep_error or 'no fresh state'}")
+        if validation.executor_decision == ExecutorDecision.ABORTED:
+            stale_action_aborts += 1
+            _record_observation(
+                recorder, frame=frame, state=state, candidates=candidates, chosen=chosen,
+                after_state=fresh_state, after_frame=fresh_frame.image,
+                interaction=InteractionOutcome.NOT_ATTEMPTED, strategic=StrategicOutcome.IN_PROGRESS,
+                action_risk=risk, execution_metadata=execution,
+                timings={"policy": round(policy_ms, 2), "revalidation_capture": fresh_frame.elapsed_ms},
+                observation_reason="stale_action_aborted",
+            )
+            if stale_action_aborts >= 3:
+                return finish_attempt("no_progress", "three consecutive planned actions became stale before execution")
+            current_frame, current_state = fresh_frame, fresh_state
+            continue
+        if pre_violations or validation.executor_decision == ExecutorDecision.BLOCKED:
+            violations = pre_violations or (validation.reason,)
+            execution["safety_violations"] = list(violations)
+            _record_observation(
+                recorder, frame=frame, state=state, candidates=candidates, chosen=chosen,
+                after_state=fresh_state, after_frame=fresh_frame.image,
+                interaction=InteractionOutcome.SAFETY_VIOLATION, strategic=StrategicOutcome.IN_PROGRESS,
+                interaction_reason=violations[0], action_risk=risk,
+                safety_violations=violations, execution_metadata=execution,
+                timings={"policy": round(policy_ms, 2), "revalidation_capture": fresh_frame.elapsed_ms},
+            )
+            return finish_attempt("safety_violation", violations[0])
+        click_ms, tap_error = send_validated(validation, execution)
+        if tap_error:
+            _record_observation(
+                recorder, frame=fresh_frame.image, state=fresh_state,
+                candidates=candidates, chosen=chosen,
+                tap_point=validation.outgoing_coordinate,
+                interaction=InteractionOutcome.UNKNOWN, strategic=StrategicOutcome.UNKNOWN,
+                action_risk=risk, execution_metadata=execution,
+                timings={"policy": round(policy_ms, 2)},
+            )
+            return finish_attempt("device_error", f"action execution failed: {tap_error}")
+        action_count += 1
+        sleep_fn(max(0.0, args.settle_seconds))
+        try:
+            next_frame = capture_fn(args.adb, args.serial)
+            next_state = observe_frame(next_frame)
+        except Exception as error:
+            _record_observation(
+                recorder, frame=fresh_frame.image, state=fresh_state,
+                candidates=candidates, chosen=chosen,
+                tap_point=validation.outgoing_coordinate,
+                interaction=InteractionOutcome.UNKNOWN, strategic=StrategicOutcome.UNKNOWN,
+                action_risk=risk, execution_metadata=execution,
+                timings={"policy": round(policy_ms, 2), "tap": float(click_ms or 0.0)},
+            )
+            return finish_attempt("device_error", f"post-action capture failed: {error}")
 
-        transition = classify_transition(state, next_state, chosen)
+        transition = classify_transition(fresh_state, next_state, chosen, action_risk=risk)
+        execution["post_action_protected_state"] = asdict(next_state.protected_state)
+        execution["safety_violations"] = list(transition.safety_violations)
         _record_observation(
             recorder,
-            frame=frame,
-            state=state,
+            frame=fresh_frame.image,
+            state=fresh_state,
             candidates=candidates,
             chosen=chosen,
-            tap_point=chosen.tile.center,
+            tap_point=validation.outgoing_coordinate,
             after_state=next_state,
             after_frame=next_frame.image,
             interaction=transition.interaction,
@@ -621,13 +957,20 @@ def run_live(
             interaction_reason=transition.interaction_reason,
             local_effect_observed=transition.local_effect_observed,
             local_effect_attribution=transition.local_effect_attribution,
+            action_risk=risk,
+            safety_violations=transition.safety_violations,
+            execution_metadata=execution,
             timings={
                 "capture": current_frame.elapsed_ms,
+                "revalidation_capture": fresh_frame.elapsed_ms,
                 "policy": round(policy_ms, 2),
-                "tap": float(click_ms),
+                "tap": float(click_ms or 0.0),
                 "verify_capture": next_frame.elapsed_ms,
             },
         )
+        if transition.interaction == InteractionOutcome.SAFETY_VIOLATION:
+            return finish_attempt("safety_violation", transition.safety_violations[0])
+        stale_action_aborts = 0
         current_frame, current_state = next_frame, next_state
         if transition.interaction == InteractionOutcome.NO_CHANGE:
             attempted.append(chosen)

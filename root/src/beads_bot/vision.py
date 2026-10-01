@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from .board import FeedObservation, GameState, LockMarker, ScreenControl, Tile
+from .board import FeedObservation, GameState, LockMarker, ProtectedState, ScreenControl, Tile
 
 
 TILE_SEARCH_REGION = (0.05, 0.52, 0.89, 0.89)
@@ -546,6 +546,97 @@ def _read_difficulty(rgb: np.ndarray) -> str | None:
     return None
 
 
+def _normalized_crop(image: Image.Image, region: tuple[float, float, float, float]) -> Image.Image:
+    width, height = image.size
+    left, top, right, bottom = region
+    return image.crop((round(left * width), round(top * height), round(right * width), round(bottom * height)))
+
+
+@lru_cache(maxsize=1)
+def _coin_counter_templates() -> dict[int, tuple[np.ndarray, ...]]:
+    """Templates are only known balances from preserved incident evidence."""
+    fixture_dir = Path(__file__).resolve().parents[2] / "img" / "safety"
+    values: dict[int, list[np.ndarray]] = {2645: [], 1745: [], 845: []}
+    labels = {
+        "resource_spend_incident_a_before.jpg": 2645,
+        "resource_spend_incident_a_after.jpg": 1745,
+        "resource_spend_incident_b_before.jpg": 1745,
+        "resource_spend_incident_b_after.jpg": 845,
+    }
+    for filename, balance in labels.items():
+        path = fixture_dir / filename
+        if not path.is_file():
+            continue
+        reference = Image.open(path).convert("RGB")
+        crop = _normalized_crop(reference, (0.77, 0.072, 0.905, 0.09)).resize((64, 16), Image.Resampling.BILINEAR)
+        values[balance].append(np.asarray(crop, dtype=np.int16))
+    return {balance: tuple(templates) for balance, templates in values.items()}
+
+
+def _read_coin_balance(image: Image.Image) -> tuple[int | None, str]:
+    if image.width < 400 or image.height < 800:
+        return None, "UNKNOWN"
+    crop = _normalized_crop(image, (0.77, 0.072, 0.905, 0.09)).resize((64, 16), Image.Resampling.BILINEAR)
+    observed = np.asarray(crop, dtype=np.int16)
+    scores: list[tuple[float, int]] = []
+    for balance, templates in _coin_counter_templates().items():
+        if templates:
+            scores.append((min(float(np.abs(observed - template).mean()) for template in templates), balance))
+    scores.sort()
+    if not scores or scores[0][0] > 12.0:
+        return None, "UNKNOWN"
+    if len(scores) > 1 and scores[1][0] - scores[0][0] < 8.0:
+        return None, "UNKNOWN"
+    return scores[0][1], "KNOWN"
+
+
+def _read_extra_holder_booster(hsv: np.ndarray) -> str:
+    height, width = hsv.shape[:2]
+    x0, x1 = round(width * 0.16), round(width * 0.285)
+    y0, y1 = round(height * 0.89), round(height * 0.975)
+    region = hsv[max(0, y0):min(height, y1), max(0, x0):min(width, x1)]
+    if region.size == 0:
+        return "UNKNOWN"
+    saturation = float(np.median(region[..., 1])) / 255.0
+    value = float(np.median(region[..., 2])) / 255.0
+    if saturation >= 0.52 and value >= 0.65:
+        return "AVAILABLE"
+    if saturation <= 0.38 and value <= 0.75:
+        return "CONSUMED"
+    return "UNKNOWN"
+
+
+def _read_holder_capacity(hsv: np.ndarray) -> tuple[int | None, str]:
+    height, width = hsv.shape[:2]
+    # The fifth holder cell is immediately to the right of the four-cell base
+    # row. Its pale inset is visually distinct from the tan playfield behind it.
+    x0, x1 = round(width * 0.68), round(width * 0.77)
+    y0, y1 = round(height * 0.44), round(height * 0.50)
+    region = hsv[max(0, y0):min(height, y1), max(0, x0):min(width, x1)]
+    if region.size == 0:
+        return None, "UNKNOWN"
+    pale = (region[..., 1] < 65) & (region[..., 2] > 210)
+    fraction = float(np.mean(pale))
+    if fraction >= 0.84:
+        return 5, "KNOWN"
+    if fraction <= 0.80:
+        return 4, "KNOWN"
+    return None, "UNKNOWN"
+
+
+def _read_protected_state(image: Image.Image, hsv: np.ndarray) -> ProtectedState:
+    coin_balance, coin_status = _read_coin_balance(image)
+    booster = _read_extra_holder_booster(hsv)
+    holder_capacity, capacity_status = _read_holder_capacity(hsv)
+    return ProtectedState(
+        coin_balance=coin_balance,
+        coin_status=coin_status,
+        extra_holder_booster=booster,
+        holder_capacity=holder_capacity,
+        holder_capacity_status=capacity_status,
+    )
+
+
 def _screen_type(rgb: np.ndarray, tiles: tuple[Tile, ...]) -> str:
     if len(tiles) >= 5:
         return "game"
@@ -1063,4 +1154,5 @@ def analyze_frame(source: str | Path | Image.Image) -> GameState:
         warnings=warnings,
         controls=controls,
         modal_substate=modal_substate,
+        protected_state=_read_protected_state(image, hsv),
     )

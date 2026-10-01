@@ -18,6 +18,7 @@ from .board import (
     StrategicOutcome,
 )
 from .policy import ActionCandidate
+from .safety import ActionRisk, protected_state_violations
 from .matching import (
     local_neighborhood_changed,
     lock_overlay_present,
@@ -27,9 +28,10 @@ from .matching import (
 )
 
 
-RUN_SCHEMA_VERSION = 2
-EVIDENCE_SCHEMA_VERSION = 2
+RUN_SCHEMA_VERSION = 3
+EVIDENCE_SCHEMA_VERSION = 3
 ACCEPTANCE_MODEL_VERSION = "tile-local-v2"
+EXECUTION_MODEL_VERSION = "safety-v1"
 
 
 class InteractionReason(str, Enum):
@@ -42,6 +44,9 @@ class InteractionReason(str, Enum):
     NO_CHANGE = "no_change"
     UNKNOWN = "unknown"
     NOT_ATTEMPTED = "not_attempted"
+    UNEXPECTED_CURRENCY_DECREASE = "unexpected_currency_decrease"
+    UNEXPECTED_BOOSTER_CONSUMPTION = "unexpected_booster_consumption"
+    UNEXPECTED_HOLDER_CAPACITY_CHANGE = "unexpected_holder_capacity_change"
 
 
 @dataclass(frozen=True)
@@ -51,6 +56,7 @@ class TransitionClassification:
     interaction_reason: InteractionReason
     local_effect_observed: bool = False
     local_effect_attribution: str = "none"
+    safety_violations: tuple[str, ...] = ()
 
 
 _STRONG_ACCEPTANCE_REASONS = {
@@ -109,6 +115,8 @@ def classify_transition(
     before_state: GameState,
     after_state: GameState | None,
     chosen: ActionCandidate | None,
+    *,
+    action_risk: ActionRisk = ActionRisk.BOARD_ACTION,
 ) -> TransitionClassification:
     """Separate action acceptance from level progress for one observed transition."""
     if after_state is None:
@@ -188,12 +196,20 @@ def classify_transition(
         strategic = StrategicOutcome.IN_PROGRESS
     else:
         strategic = StrategicOutcome.UNKNOWN
+    violations = protected_state_violations(before_state, after_state, action_risk)
+    if violations:
+        interaction = InteractionOutcome.SAFETY_VIOLATION
+        interaction_reason = next(
+            (reason for reason in InteractionReason if reason.value == violations[0]),
+            InteractionReason.UNKNOWN,
+        )
     return TransitionClassification(
         interaction=interaction,
         strategic=strategic,
         interaction_reason=interaction_reason,
         local_effect_observed=local_effect_observed,
         local_effect_attribution=local_effect_attribution,
+        safety_violations=violations,
     )
 
 
@@ -273,6 +289,9 @@ class RunRecorder:
         uncertain_assumptions: tuple[str, ...] = (),
         observation_reason: str | None = None,
         observation_index: int | None = None,
+        action_risk: ActionRisk = ActionRisk.BOARD_ACTION,
+        safety_violations: tuple[str, ...] = (),
+        execution_metadata: Mapping[str, object] | None = None,
     ) -> str:
         if self._finished:
             raise RuntimeError("cannot append to a finalized run")
@@ -282,7 +301,7 @@ class RunRecorder:
             or local_effect_observed is None
             or local_effect_attribution is None
         ):
-            transition = classify_transition(before_state, after_state, chosen)
+            transition = classify_transition(before_state, after_state, chosen, action_risk=action_risk)
         if interaction_reason is None:
             interaction_reason = (
                 transition.interaction_reason
@@ -297,6 +316,8 @@ class RunRecorder:
             local_effect_observed = transition.local_effect_observed if transition is not None else False
         if local_effect_attribution is None:
             local_effect_attribution = transition.local_effect_attribution if transition is not None else "none"
+        if not safety_violations and transition is not None:
+            safety_violations = transition.safety_violations
         interaction_reason = _outcome(interaction_reason)
         if (
             chosen is not None
@@ -310,6 +331,7 @@ class RunRecorder:
         event = {
             "schema_version": RUN_SCHEMA_VERSION,
             "acceptance_model_version": ACCEPTANCE_MODEL_VERSION,
+            "execution_model_version": EXECUTION_MODEL_VERSION,
             "run_id": self.run_id,
             "step_id": step_id,
             "before_state": _state_data(before_state),
@@ -323,7 +345,9 @@ class RunRecorder:
                 "strategic": _outcome(strategic_outcome),
                 "local_effect_observed": local_effect_observed,
                 "local_effect_attribution": local_effect_attribution,
+                "safety_violations": list(safety_violations),
             },
+            "execution": _value(execution_metadata or {}),
             "timings_ms": _value(timings_ms),
             "uncertain_assumptions": list(uncertain_assumptions or (chosen.assumptions if chosen else ())),
             "frames": {"before": before_path, "after": after_path},
@@ -343,6 +367,7 @@ class RunRecorder:
                 self._append_jsonl(self.evidence_path, {
                     "schema_version": EVIDENCE_SCHEMA_VERSION,
                     "acceptance_model_version": ACCEPTANCE_MODEL_VERSION,
+                    "execution_model_version": EXECUTION_MODEL_VERSION,
                     "record_type": "action",
                     **_context_data(chosen.context),
                     "interaction_outcome": interaction,
@@ -394,6 +419,18 @@ class RunRecorder:
             "success": StrategicOutcome.LEVEL_SUCCESS.value,
             "failure": StrategicOutcome.LEVEL_FAILURE.value,
         }.get(status)
+        if strategic_outcome is None:
+            strategic_outcome = next(
+                (
+                    event["outcomes"]["strategic"]
+                    for event in reversed(self._events)
+                    if event["outcomes"]["strategic"] in (
+                        StrategicOutcome.LEVEL_SUCCESS.value,
+                        StrategicOutcome.LEVEL_FAILURE.value,
+                    )
+                ),
+                None,
+            )
         if strategic_outcome:
             sequence = [
                 {
@@ -411,6 +448,7 @@ class RunRecorder:
             self._append_jsonl(self.evidence_path, {
                 "schema_version": EVIDENCE_SCHEMA_VERSION,
                 "acceptance_model_version": ACCEPTANCE_MODEL_VERSION,
+                "execution_model_version": EXECUTION_MODEL_VERSION,
                 "record_type": "episode",
                 "mechanic_id": "action-sequence",
                 "features": {"action_count": len(sequence)},
@@ -424,10 +462,14 @@ class RunRecorder:
         manifest = {
             "schema_version": RUN_SCHEMA_VERSION,
             "acceptance_model_version": ACCEPTANCE_MODEL_VERSION,
+            "execution_model_version": EXECUTION_MODEL_VERSION,
             "run_id": self.run_id,
             "status": status,
             "reason": reason,
-            "possible_failure_example": status in ("failure", "unrecognized_ui"),
+            "possible_failure_example": status in ("failure", "unrecognized_ui") or any(
+                event["outcomes"]["strategic"] == StrategicOutcome.LEVEL_FAILURE.value
+                for event in self._events
+            ),
             "step_count": len(self._events),
             "events_path": self.events_path.name,
             "recent_steps": recent,
